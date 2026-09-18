@@ -9189,3 +9189,40 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   presented at 20 FPS and the profiling counters were absent.
 - Cleanup: the profiling hash `b542p143` was removed after the Gradle daemon was stopped,
   3,225,522,870 bytes reclaimed. Only `1qa67114` remains under `.cxx/RelWithDebInfo`.
+- Field patch, same day: the saved registers on the main thread's stack at the vblank wait give
+  the frame function's caller `this` as `0x0801DA48`, so the vsync field is `0x0801DA96`. A cheat
+  writing 16-bit 2 there, with the original load instruction intact, gave: title 29.9 FPS at a
+  33.75 ms median; intro 29.9 FPS at 33.74 ms; overlay FPS 30, Speed 100%, frame 7.8 ms. The
+  per-second luminance series after the New Game press was
+  `0.0, 2.9, 3.3, 90.0, 90.9, 110.8, 116.1, 105.0, 112.1, 54.5, ...` against the 20 FPS baseline
+  `0.0, 3.2, 3.2, 90.0, 89.9, 109.0, 116.3, 108.4, 112.1, 54.3, ...`: the same scene timing. The
+  game therefore steps its logic from the same field. The instruction patch is withdrawn and the
+  bundled cheats now write the field.
+- A launch attempted while the screen was asleep aborted in `EmuWindow_Android` with
+  `surface is nullptr` and then `Presentation not supported on this platform`. Recorded as a
+  robustness bug; the tools keep the screen on during a session.
+- 60 FPS field value (16-bit 1): title and intro at 59.3 FPS with a 16.87 ms median and P95;
+  overlay FPS 60, Speed 100%, frame 13.6 ms with 12.4 ms remainder; GPU busy 39.5% at 3x;
+  emulation thread 41% of one core. The pacing series matched the 20 FPS baseline again. The
+  emulation work per frame is 13.6 ms of a 16.7 ms budget at 60 FPS, so 30 FPS is the setting
+  that leaves headroom, and fast-forward does not apply at 60 FPS.
+- E.X. Troopers geometry-shader draws, from a one-shot log in the command processor at the
+  save-slot screen: every configuration is mode 0 (Point), topology 3 (Shader),
+  `input_to_uniform` 0, fixed vertex count 1, stride 1, start index 0, with vertex-shader output
+  maps of 8 or 10 attributes and three geometry programs at main offsets 0x2E, 0x3C, and 0x58.
+  Draw sizes range from 1 to about 20 vertices. The command processor rejects all of them at
+  `PicaCore::ProcessDraw` with the comment "register preservation", before any backend check, so
+  the rasterizers' point-mode checks and `SetupGeometryShader` never see a geometry shader. The
+  GLSL decompiler logs an error for `EMIT` and `SETEMIT`, and the ARM64 shader JIT compiles them,
+  so the software path already runs at JIT speed. A hardware path needs: decompiler support for
+  the emit instructions and the emit slot and winding flags, a geometry-shader uniform block, a
+  fragment interface driven by the geometry output map instead of the vertex output map, a
+  geometry stage in the Vulkan pipeline cache and disk cache, and a guard for programs that read
+  registers before writing them. Expected gain: the GSP command time of about 4.7 ms per frame
+  and the 520 immediate draws per frame move to the GPU. It does not remove the 440 render pass
+  switches per frame, which come from the game's render-to-texture pattern and carry the image
+  barriers that stall the GPU on the menu screens.
+- Installed at the end of this work: production APK with the field-patch cheats and no
+  diagnostics, 29179895 bytes, SHA-256 `2F68B6F0DC3DA8F7FD8BC6D1482FFDD8FFAAD219CF5E62F5EC79CF70A29C460C`. Sanity launch with the cheats disabled presented at
+  20 FPS with no diagnostic lines in the log. config.ini restored byte for byte; screen-on
+  setting reset to false; performance mode 2, fan mode 4, brightness 255 unchanged.

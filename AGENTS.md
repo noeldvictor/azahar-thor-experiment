@@ -1572,3 +1572,19 @@
   step. The method that located the pacing loop, a kernel trace of blocking waits and address
   arbitration with an on-demand memory dump, is recorded in the notes and is temporary code, not
   a feature.
+- Correction, 2026-09-18, later the same day: the Medarot 9 codes now patch the game object's
+  vsync field at `0x0801DA96` (16-bit write `1801DA96 00000002` for 30 FPS, `00000001` for
+  60 FPS) instead of the load instruction. The game reads that field for its logic step as well,
+  so the intro pacing at 30 FPS matches 20 FPS second for second, with Speed 100%. The codes are
+  named `30 FPS - Thor Experiment` and `60 FPS - Thor Experiment` and ship disabled. The object
+  address is a heap address that was identical in every launch of this session; a patch to the
+  field is the correct form, and the earlier instruction patch is withdrawn. A launch while the
+  Thor's screen is off aborts with `surface is nullptr`; keep the screen on before launching.
+- E.X. Troopers geometry shaders (2026-09-18): point mode, shader topology, inputs from vertex
+  outputs, three small programs. `PicaCore::ProcessDraw` rejects every geometry shader before
+  the backend is asked, so the backend point-mode checks are dead code. A hardware path is a
+  multi-day feature (decompiler emit support, geometry uniforms, output-map-driven fragment
+  interface, pipeline and disk cache stage, register-preservation guard). It would move the
+  CPU vertex and geometry work to the GPU and remove the 520 immediate draws per frame. It would
+  not remove the render pass switches and barriers that saturate the GPU on the menu screens.
+  Rank the barrier cost first if the goal is 60 FPS at 3x on this title.

@@ -15,7 +15,7 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
 
 1. For each title, the native frame rate at full speed is known per scene: title, menu, cutscene, gameplay. Full speed means the overlay shows `Speed: 100%`.
 2. Each title holds full speed at 2x, 3x, and 4x in gameplay. Where it does not, the cause is measured and recorded, and a code change is attempted and measured.
-3. A title that waits three vsyncs per frame by its own design gets a 30 FPS patch code as a bundled cheat under `src/android/app/src/main/assets/cheats/<title id>.txt`, verified on the Thor for speed and for game pacing. Medarot 9 has the code but fails the pacing check; see its status.
+3. A title that waits three vsyncs per frame by its own design gets a 30 FPS patch code as a bundled cheat under `src/android/app/src/main/assets/cheats/<title id>.txt`, verified on the Thor for speed and for game pacing. Medarot 9 has both codes and they pass the pacing check; see its status.
 4. Every emulator change follows AGENTS.md: a correctness argument, an `arm64-v8a` build, and a matched before and after measurement on the Thor. A patch code is guest-code patching and is recorded as a cheat, not as an optimization.
 
 ## Status on 2026-09-18
@@ -25,7 +25,13 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
 - Presents at 20 FPS by design in the title screen, the intro, and the street dialog. Speed 100% at 2x and 3x. At 4x, normal speed holds 19.8 FPS with a P95 interval of 84 ms and fast-forward stops near Speed 150%.
 - Root cause of the 4x limit: the game copies its rendered 400x240 RGB8 top framebuffer with the CPU every frame from a loop at guest PC `0x004008C0`. The first 4-byte read flushes the whole dirty surface: one 384 KiB download and one GPU finish per frame. CPU and GPU never overlap. At 4x the GPU frame is about 11 ms.
 - A dirty-free-span fast path for the remaining reads was measured and rejected. See AGENTS.md.
-- 30 FPS code: found and tested. The caller at `0x003D8268` loads the vsync target (3) with `ldrh r1, [r4, #0x4e]`; the bundled cheat `30 FPS - game speed 1.5x - experimental` replaces it with `mov r1, #2`. The title then presents at a locked 30 FPS at Speed 100%. The game logic is frame-stepped, so it runs 1.5 times faster; the intro that takes 6 s at 20 FPS takes 4 s at 30 FPS. The two float constants near the main module (20.0 and 0.05) are not the step. A finished patch needs the frame-counted timers found and scaled, which is open.
+- 30 FPS code: finished. The vsync target is a 16-bit field of the game object at heap address
+  `0x0801DA48 + 0x4e`, read by `ldrh r1, [r4, #0x4e]` at `0x003D8268`. Patching the load alone
+  gave 30 FPS with the logic 1.5 times too fast. Patching the field itself (`1801DA96 00000002`)
+  gives 30 FPS at Speed 100% with the intro pacing identical to 20 FPS second for second, so the
+  game also uses that field as its logic step. The bundled cheats `30 FPS - Thor Experiment` and
+  `60 FPS - Thor Experiment` write 2 or 1 there. The heap address was stable across every launch
+  in this session; if a launch ever loads it elsewhere the cheat has no effect and does no harm.
 
 ### E.X. Troopers
 
@@ -36,6 +42,9 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
   no frame-rate patch. Its target is GPU efficiency: at 3x the same scene would exceed the GPU.
 - Bug: opening the game's pause menu during a video freezes emulation. The VulkanWorker thread then spins on `dequeueBuffer timed out`. Reproduced twice. Avoid START during videos until fixed. Record it in the ledger.
 - The hack list already forces `SKIP_TEXTURE_COPY_FALLBACK` for this title. The same key in the per-title ini is redundant.
+- Geometry shaders: point mode, shader topology, inputs from vertex outputs, three programs. All
+  are rejected in `PicaCore::ProcessDraw`. A hardware geometry stage is feasible for this mode but
+  is a multi-day feature; see AGENTS.md. It does not remove the render pass switches.
 
 ## Procedure
 
