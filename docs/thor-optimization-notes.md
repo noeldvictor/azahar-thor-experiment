@@ -9310,3 +9310,9 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   are on from this commit. Installed at the end: production APK SHA-256
   `8675d2c0f53f6add1347d11489d6ef3a36eb80513b2eca8710dd3168f070623e`.
 - Keepalive trial on Turnip: 140 fault lines at launch and the same stall. Rejected.
+- Final build with pass merging on the system driver, 2x (2026-09-18, 19:05): save-slot screen
+  59.3 FPS, 16.86 ms P95, 93.7% GPU; engine scene 51.9 FPS, 33.7 ms P95, 99.9% GPU at 680 MHz,
+  emulation thread 78% of a core. The control gave 51.2 FPS at 99.9% in the same scene: the
+  merging does not move the 3D scene on this driver. The intro videos ran at 59.3 FPS with
+  86.4% GPU, which is far too much for a 30 FPS video and points at the upload or copy path.
+  Next: a profiling build at the engine scene on this driver to rank the counters there.
