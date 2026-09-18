@@ -56,8 +56,17 @@ object ThorMaintenance {
             val redirectDir = File(files, "gpu/vk_file_redirect")
             when (op) {
                 "list" -> {
-                    result.put("files_dir", files.canonicalPath)
-                    result.put("entries", listTree(files, 500))
+                    // The whole private data directory: files, shared_prefs, cache, databases.
+                    val dataDir = files.parentFile ?: files
+                    result.put("data_dir", dataDir.canonicalPath)
+                    result.put("entries", listTree(dataDir, 800))
+                    val prefs = JSONObject()
+                    File(dataDir, "shared_prefs").listFiles()?.forEach {
+                        if (it.isFile && it.length() < 65536) {
+                            prefs.put(it.name, it.readText())
+                        }
+                    }
+                    result.put("shared_prefs", prefs)
                 }
                 "verify" -> result.put("driver", verifyDriver(driverDir))
                 "clear_redirect" -> {

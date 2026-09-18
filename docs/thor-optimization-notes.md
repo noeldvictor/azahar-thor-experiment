@@ -9269,3 +9269,16 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   is a request file in the user directory read at app startup; an exported receiver was
   rejected as too wide a surface.
 - Cleanup: the temporary logs in the rasterizer are removed; the pass merging switches stay off.
+- Device fault, second pass (2026-09-18, 16:30 to 17:30) with the new tools. A full power-off
+  did not clear it: zero fault lines at boot, a 20-line burst three seconds into the first
+  Vulkan launch, then the stall. Short launches, fault lines added per launch: baseline +30,
+  secondary panel off +29, disk shader cache off +40, asynchronous shaders off +20, resolution
+  1x +40, hardware shaders off +40 (that one did not stall). Turnip R8 Sysmem +40 and the
+  T30 build +40 (both recovered), R8 +30 (stalled). The system Qualcomm Vulkan driver logged
+  zero fault lines and still stalled with the GPU idle: the stall and the fault are separate
+  symptoms of one cause below the emulator's settings. The app's private data is unchanged
+  since 2026-09-15 (`app_maintenance list` now covers shared_prefs, cache, and databases).
+  Internal storage has 39 GB free. Clearing the immersive-mode confirmation changed nothing.
+  The panels' refresh setting could not be changed from the shell. Kernel view: `hwcg=1`,
+  `ifpc=1`, `force_no_nap=1`, `min_pwrlevel=1`, all root-only; the performance mode only moves
+  `min_pwrlevel`. Open test: a fifteen-minute cool-down with the app stopped, then one launch.

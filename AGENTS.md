@@ -1630,3 +1630,9 @@
   `thor_maintenance.txt` from the user directory at startup, runs one of list, verify,
   clear_redirect, reinstall_driver, or system_driver on its own driver directories, and writes
   `log/thor_maintenance.json`.
+- Thor GPU fault, additional facts (2026-09-18 evening): the system Qualcomm Vulkan driver logs
+  no fault but the app still stalls with the GPU idle, so the fault lines are Turnip's
+  reaction, not the cause; a full power-off does not clear the condition; no emulator setting
+  and no Turnip build avoids it; software vertex shaders avoid the stall but not the fault.
+  Until the cause is found, take Vulkan measurements only after `gpu_faults` shows no new
+  burst during the run, and prefer scenes reached without a fresh launch.
