@@ -373,9 +373,17 @@ void RasterizerVulkan::SetupVertexArray(const u16* gather_indices, u32 gather_co
 
     stream_buffer.Commit(buffer_offset);
 
-    // Assign the rest of the attributes to the last binding. An instanced draw gets one copy
-    // of the fixed block per instance, because every binding advances per instance.
-    SetupFixedAttribs(instance_rate ? std::max<u32>(gather_count, 1) : 1);
+    // Assign the rest of the attributes to the last binding.
+    SetupFixedAttribs();
+
+    if (instance_rate) {
+        // The loader bindings advance per instance. The fixed block is the one per-vertex
+        // binding of the draw, with a zero stride so that every host vertex reads its single
+        // element. A draw whose bindings all advance per instance hangs the Qualcomm driver.
+        VertexBinding& fixed = layout.bindings[layout.binding_count - 1];
+        fixed.fixed.Assign(0);
+        fixed.byte_count.Assign(0);
+    }
 }
 
 void RasterizerVulkan::SetupFixedAttribs(u32 copies) {
@@ -521,6 +529,12 @@ bool RasterizerVulkan::AccelerateGeometryDrawBatch(bool is_indexed) {
     if (pipeline.gs_config.mode != Pica::PipelineRegs::GSMode::Point ||
         pipeline.triangle_topology != Pica::PipelineRegs::TriangleTopology::Shader ||
         pipeline.variable_primitive != 0 || gs_regs.input_to_uniform != 0) {
+        return fallback();
+    }
+
+    // The expanded draw hangs the Qualcomm proprietary driver on the Adreno 740 without a
+    // kernel fault (2026-09-18). It runs on Turnip. Keep those draws in software there.
+    if (instance.GetDriverID() == vk::DriverIdKHR::eQualcommProprietary) {
         return fallback();
     }
 
