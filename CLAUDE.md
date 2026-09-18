@@ -62,6 +62,8 @@ of a raw `adb` command when a tool exists.
   verify, clear_redirect, reinstall_driver, or system_driver. The app reads the request from
   `thor_maintenance.txt` in the user directory at startup and writes `log/thor_maintenance.json`.
 - `ui_dump` and `ui_tap` read the visible UI of a panel and press a node by its text.
+- `driver_env` sets environment variables for the GPU driver at the next launch through
+  `thor_driver_env.txt` in the user directory, for example `TU_DEBUG` flags for Turnip.
 - `install`, `pull`, `push`, `shell`, and `logcat` cover the rest.
 
 When a test needs a device capability that no tool provides, add a tool to the server and record

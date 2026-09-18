@@ -580,6 +580,21 @@ def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25
 
 
 @mcp.tool()
+def driver_env(assignments: dict[str, str] | None = None) -> str:
+    """Set environment variables for the GPU driver inside the app, for example
+    {"TU_DEBUG": "nobin"} to switch off a Turnip feature. The app reads thor_driver_env.txt from
+    the user directory before it loads the driver. An empty dict removes the file. Takes effect
+    at the next launch."""
+    remote = f"{USER_DIR}/thor_driver_env.txt"
+    if not assignments:
+        _sh(f"rm -f '{remote}'")
+        return "driver environment cleared"
+    text = "".join(f"{k}={v}\n" for k, v in assignments.items())
+    _write_remote_text(remote, text)
+    return f"driver environment set: {assignments}"
+
+
+@mcp.tool()
 def gpu_faults(max_bursts: int = 12) -> dict:
     """Count Adreno command-processor faults ('CP: AHB bus error') in the kernel log and map each
     burst to wall-clock time through the audit lines, which carry both clocks. A burst is a run

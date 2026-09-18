@@ -81,6 +81,8 @@ object GpuDriverHelper {
         // Initialize hook libraries directory.
         hookLibPath = CitraApplication.appContext.applicationInfo.nativeLibraryDir + "/"
 
+        applyDriverEnvironment()
+
         val activeDriver = customDriverData
         val activeDriverMetadata = JSONObject()
             .put("name", activeDriver.name ?: "System GPU driver")
@@ -95,6 +97,31 @@ object GpuDriverHelper {
             activeDriver.libraryName,
             fileRedirectionPath
         )
+    }
+
+    /**
+     * Thor MCP: `thor_driver_env.txt` in the user directory holds KEY=VALUE lines that are set in
+     * the process environment before the driver loads, for example TU_DEBUG=nobin. The Turnip
+     * driver reads them when the Vulkan instance is created. No file means no change.
+     */
+    private fun applyDriverEnvironment() {
+        try {
+            val userPath = DirectoryInitialization.userPath ?: return
+            val root = DocumentFile.fromTreeUri(CitraApplication.appContext, Uri.parse(userPath))
+                ?: return
+            val file = root.findFile("thor_driver_env.txt") ?: return
+            val text = CitraApplication.appContext.contentResolver.openInputStream(file.uri)
+                ?.use { String(it.readBytes()) } ?: return
+            text.lines().map(String::trim).filter { it.contains('=') && !it.startsWith("#") }
+                .forEach { line ->
+                    val key = line.substringBefore('=').trim()
+                    val value = line.substringAfter('=').trim()
+                    android.system.Os.setenv(key, value, true)
+                    Log.info("[GpuDriverHelper] Driver environment: $key=$value")
+                }
+        } catch (e: Exception) {
+            Log.error("[GpuDriverHelper] Driver environment: ${e.message}")
+        }
     }
 
     fun getDrivers(): MutableList<Pair<Uri, GpuDriverMetadata>> {
