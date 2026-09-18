@@ -180,7 +180,8 @@ def _apply_assignments(text: str, assignments: dict[str, str]) -> str:
 
 
 def _read_remote_text(remote: str) -> str:
-    return _adb(["-s", _serial(), "shell", f"cat '{remote}'"])
+    # exec-out is binary safe. A plain shell cat inserts CR before every LF on Windows hosts.
+    return _adb(["-s", _serial(), "exec-out", "cat", remote], binary=True).decode("utf-8", "replace")
 
 
 def _write_remote_text(remote: str, text: str) -> None:
@@ -522,8 +523,9 @@ def frame_profile(lines: int = 4000) -> str:
 
 @mcp.tool()
 def install(apk_path: str) -> str:
-    """Install an APK over the existing app (adb install -r)."""
-    out = _adb(["-s", _serial(), "install", "-r", apk_path], timeout=600)
+    """Install an APK over the existing app (adb install -r -d). Downgrades are allowed so that a
+    control build can be reinstalled for a before/after measurement."""
+    out = _adb(["-s", _serial(), "install", "-r", "-d", apk_path], timeout=600)
     version = re.search(r"versionName=(\S+)", _sh(f"dumpsys package {PACKAGE}"))
     return f"{out.strip()} version={version.group(1) if version else '?'}"
 

@@ -1510,3 +1510,33 @@
   experiments in `AGENTS.md`, dated measurements in `docs/thor-optimization-notes.md`, and a public
   description in `README.md`. `README.md` and `CLAUDE.md` point at `AGENTS.md` instead of restating
   engineering detail, so a behavior change is recorded in exactly one place.
+- Medarot 9 (`0004000000174F00`, Kuwagata, English patch) copies its rendered 400x240 RGB8 top
+  framebuffer with the CPU every frame. The copy loop runs at guest PC `0x004008C0`. The first
+  4-byte read of each frame hits the dirty framebuffer surface. `RasterizerCache::FlushRegion`
+  treats a request of 8 bytes or less as a CPU read and flushes the whole dirty region. That is
+  one 384 KiB download and one GPU finish per frame. The finish waits for the frame's draws, which
+  the scheduler submits only at that point, so the CPU and the GPU never overlap in this title.
+  At 3x the GPU frame is about 6.7 ms and fast-forward reaches the 60 FPS Eco Turbo presentation
+  cap at Speed 286%. At 4x the GPU frame is about 11 ms and fast-forward stops near Speed 150%,
+  with about 30% of one core spent inside the driver's semaphore wait. The title presents at
+  20 FPS by design and runs at Speed 100% at 2x and 3x. Do not read the 4x limit as a renderer
+  regression. Disabling right-eye rendering changed nothing; the title does not render a second
+  eye. Evidence: the 2026-09-17 Medarot 9 entry in `docs/thor-optimization-notes.md`.
+- Rejected 2026-09-17: a dirty-free-span fast path in `RasterizerCache::FlushRegion` that let a
+  small read inside the last flushed span skip the dirty-region lookup. A matched six-config
+  production A/B on the Thor showed no change in frame pacing, GPU busy, or emulation-thread user
+  and system time. The code was reverted. Reconsider only with a profile that attributes
+  measurable time to the flush lookup itself. The next candidate for that title is to unregister
+  a surface after a small CPU read has flushed it in full, which mirrors the CPU-write path and
+  lets the remaining reads of the frame take the fast memory path.
+- Diagnostics kept from that work: `LOG_DEBUG(HW_GPU, ...)` lines at every point where
+  `AccelerateTextureCopy` and `AccelerateDisplayTransfer` refuse acceleration. Enable them with
+  `log_filter = *:Info HW.GPU:Debug` under `[Miscellaneous]` in `config.ini`. A per-title
+  `Compatibility.skip_texture_copy_fallback` key has no effect, because `src/video_core/gpu.cpp`
+  sets that value from the hack list with a `false` default. Add a hack-list entry instead.
+- Device automation: the `thor` MCP server in `tools/thor-mcp/server.py` is the supported way to
+  drive the Thor. Send button presses as held presses; the guest samples input once per frame and
+  a plain `input keyevent` tap is missed. Launch a title through the tree-form content URI that
+  the app holds a grant for; the plain document URI crashes `EmulationFragment.onCreate` with a
+  `SecurityException`. Install A/B builds with `adb install -r -d`; the working tree's version
+  code is newer than any kept control APK.

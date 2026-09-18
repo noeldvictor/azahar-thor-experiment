@@ -229,6 +229,11 @@ bool RasterizerCache<T>::AccelerateTextureCopy(const Pica::DisplayTransferConfig
 
     const auto [src_surface_id, src_rect] = GetTexCopySurface(src_params);
     if (!src_surface_id) {
+        LOG_DEBUG(HW_GPU,
+                  "TextureCopy fallback: no source surface src=0x{:08X} dst=0x{:08X} size={} "
+                  "in_width={} in_gap={} out_width={} out_gap={}",
+                  src_params.addr, config.GetPhysicalOutputAddress(), copy_size, input_width,
+                  input_gap, output_width, output_gap);
         return Settings::values.skip_texture_copy_fallback;
     }
 
@@ -237,6 +242,11 @@ bool RasterizerCache<T>::AccelerateTextureCopy(const Pica::DisplayTransferConfig
         (output_width != src_info.BytesInPixels(src_rect.GetWidth() / src_info.res_scale) *
                              (src_info.is_tiled ? 8 : 1) ||
          output_gap % src_info.BytesInPixels(src_info.is_tiled ? 64 : 1) != 0)) {
+        LOG_DEBUG(HW_GPU,
+                  "TextureCopy fallback: output gap mismatch src=0x{:08X} dst=0x{:08X} size={} "
+                  "out_width={} out_gap={} src_rect_width={} res_scale={} tiled={}",
+                  src_params.addr, config.GetPhysicalOutputAddress(), copy_size, output_width,
+                  output_gap, src_rect.GetWidth(), src_info.res_scale, src_info.is_tiled);
         return false;
     }
 
@@ -254,6 +264,8 @@ bool RasterizerCache<T>::AccelerateTextureCopy(const Pica::DisplayTransferConfig
     const auto [dst_surface_id, dst_rect] =
         GetSurfaceSubRect(dst_params, ScaleMatch::Upscale, load_gap);
     if (!dst_surface_id) {
+        LOG_DEBUG(HW_GPU, "TextureCopy fallback: no destination surface src=0x{:08X} dst=0x{:08X}",
+                  src_params.addr, dst_params.addr);
         return false;
     }
 
@@ -262,6 +274,12 @@ bool RasterizerCache<T>::AccelerateTextureCopy(const Pica::DisplayTransferConfig
 
     if (dst_surface.type == SurfaceType::Texture ||
         !CheckFormatsBlittable(src_surface.pixel_format, dst_surface.pixel_format)) {
+        LOG_DEBUG(HW_GPU,
+                  "TextureCopy fallback: destination type/format src=0x{:08X} dst=0x{:08X} "
+                  "src_format={} dst_format={} dst_is_texture={}",
+                  src_params.addr, dst_params.addr, PixelFormatAsString(src_surface.pixel_format),
+                  PixelFormatAsString(dst_surface.pixel_format),
+                  dst_surface.type == SurfaceType::Texture);
         return false;
     }
 
@@ -322,6 +340,7 @@ bool RasterizerCache<T>::AccelerateDisplayTransfer(const Pica::DisplayTransferCo
 
     auto [src_surface_id, src_rect] = GetSurfaceSubRect(src_params, ScaleMatch::Ignore, true);
     if (!src_surface_id) {
+        LOG_DEBUG(HW_GPU, "DisplayTransfer fallback: no source surface {}", config.DebugName());
         return false;
     }
 
@@ -330,6 +349,8 @@ bool RasterizerCache<T>::AccelerateDisplayTransfer(const Pica::DisplayTransferCo
     const auto [dst_surface_id, dst_rect] =
         GetSurfaceSubRect(dst_params, ScaleMatch::Upscale, false);
     if (!dst_surface_id) {
+        LOG_DEBUG(HW_GPU, "DisplayTransfer fallback: no destination surface {}",
+                  config.DebugName());
         return false;
     }
 
@@ -344,6 +365,9 @@ bool RasterizerCache<T>::AccelerateDisplayTransfer(const Pica::DisplayTransferCo
     }
 
     if (!CheckFormatsBlittable(src_surface.pixel_format, dst_surface.pixel_format)) {
+        LOG_DEBUG(HW_GPU, "DisplayTransfer fallback: formats {} -> {} are not blittable {}",
+                  PixelFormatAsString(src_surface.pixel_format),
+                  PixelFormatAsString(dst_surface.pixel_format), config.DebugName());
         return false;
     }
 

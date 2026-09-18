@@ -9059,3 +9059,63 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   churn, texture upload/conversion traffic, hardware-shader fallback frequency, pipeline churn,
   frame pacing, and idle wakeups. Those need counters plus matched scenes; further instruction
   reductions should not substitute for that whole-emulator accounting.
+
+## 2026-09-17 Medarot 9 4x Fast-Forward Diagnosis, Thor MCP Server, Rejected Flush Fast Path
+
+- Question: Medarot 9 (`0004000000174F00`) was reported as very slow. The goal was full speed at
+  2x to 4x with fast-forward working, reached through code efficiency.
+- Setup: AYN Thor over USB serial `c3ca0370`, Mesa Turnip R8 (Vulkan 1.4.335), performance mode
+  2, fan mode 4, brightness 255 in manual mode, USB power, Eco Turbo on. Scene: the intro street
+  dialog after New Game, reached by a held START and a held A on the title screen. Control build:
+  production `31e455c30-vanilla-thor`, 29,177,431 bytes, SHA-256
+  `8D4C2AE10C7C89EFF817867E9736AFA6AB7DB31FB5A8334D53F007A8498A1F4B`. Profiling builds used
+  `-PthorFrameProfiling=true` for counters and temporary logs; no FPS claim comes from them.
+- Finding 1: the title presents at 20 FPS by design. The title screen and the intro scene show
+  Speed 100% at 3x with 5.4 to 6.2 ms of emulation work per 50 ms frame. The reported slowness
+  is the native 20 FPS, not a speed deficit.
+- Finding 2, control matrix on the production build (SurfaceFlinger mean FPS and P95 interval,
+  KGSL GPU busy at 615 MHz, NativeEmulation thread user and system time as percent of one core):
+  2x/100%: 19.9 FPS, 50.6 ms, 7.8%, 23.3/0.7. 2x/300%: 52.3 FPS, 33.7 ms, 23.0%, 65.3/0.7.
+  3x/100%: 19.9 FPS, 50.6 ms, 13.2%, 24.0/0.7. 3x/300%: 57.9 FPS, 16.9 ms, 38.5%, 64.3/0.3.
+  4x/100%: 19.8 FPS, 84.2 ms, 20.6%, 23.3/21.3. 4x/300%: 30.3 FPS, 50.5 ms, 32.1%, 36.0/30.3.
+  The overlay at 4x/300% read Speed 156%, frame 10.8 ms, GSP command time 3.1 ms, remainder
+  7.2 ms. At 3x/300% it read Speed 286%.
+- Finding 3, frame profiler at 4x/300% per 300-swap window: `download_per_swap` 0.333 with
+  125 KiB per swap, which is one 384 KiB RGB8 400x240 surface per frame; `finish` 100;
+  `wait_ms_per_swap` 3.70 at 4x and 2.17 at 3x; `display_transfer` 200 at 276 Mpix (4x) and
+  156 Mpix (3x); zero texture copies; zero software fallbacks; 100% accelerated draws. The wait
+  is `vkWaitSemaphores` with an infinite timeout, so the kernel time is the driver's wait, not
+  emulator polling.
+- Finding 4, temporary logs at every flush site located the trigger: the guest CPU read path in
+  `src/core/memory.cpp` (`Read<u32>`), 4 bytes at the framebuffer base, alternating between
+  `0x2040C870` and `0x20452D80`, guest PC `0x004008C0`, LR `0x004008D0`, a loop that reads the
+  whole buffer. It was not the texture copy fallback, not the vertex fetch flush, not surface
+  validation, and not a CPU write. The read comes 2 ms after the frame's last draw; the next draw
+  follows 20 ms later, which is the GPU wait.
+- Experiment A, reverted before measurement: a small-CPU-write counter before the
+  flush-and-remove branch in `InvalidateRegion`. The branch never fired for this title.
+- Experiment B, rejected: a dirty-free-span fast path in `RasterizerCache::FlushRegion` for
+  requests of 8 bytes or less. Candidate matrix in the same order as the control matrix:
+  2x/100%: 19.9 FPS, 50.6 ms, 7.8%, 23.7/0.3. 2x/300%: 51.9 FPS, 33.7 ms, 22.4%, 65.3/0.3.
+  3x/100%: 19.9 FPS, 50.6 ms, 13.2%, 23.7/0.3. 3x/300%: 55.3 FPS, 33.7 ms, 37.5%, 62.0/3.3.
+  4x/100%: 19.6 FPS, 84.3 ms, 20.2%, 22.7/22.7. 4x/300%: 30.8 FPS, 50.6 ms, 33.0%, 33.7/31.7.
+  The overlay at 4x/300% read Speed 153%, frame 10.9 ms, GSP command time 3.2 ms, remainder
+  7.3 ms. Every difference is inside run-to-run noise. The code was reverted.
+- Experiment C, settings, informational only: `disable_right_eye_render = true` at 4x/300% on
+  the candidate build gave 31.2 FPS, GPU busy 33.8%, thread 36.7/29.3. No change. The title does
+  not render a second eye.
+- Kept: `LOG_DEBUG` lines at the acceleration refusal points of `AccelerateTextureCopy` and
+  `AccelerateDisplayTransfer`. They cost nothing while the `HW.GPU` class stays at Info.
+- Tooling added in the same work: `tools/thor-mcp/server.py` with `.mcp.json`, the `/goal`
+  command, and the writing standard in `CLAUDE.md`. Two facts about the device that the tools
+  encode: a held press is required because the guest samples input once per frame, and a launch
+  must use the tree-form content URI or the app crashes with a `SecurityException`.
+- Not measured: a battle scene, unplugged battery power, and image correctness beyond the
+  captured screenshots. No power or thermal claim is made.
+- Build and cleanup: the final production APK of this work is `f0ac9bad4-vanilla-thor` plus the
+  debug-log change, 29,179,671 bytes, SHA-256
+  `1E7C4752804F0F2ECAE20E0BA24FBA318D37CF22C19F555A93F1B2349DFDB01E`, installed on the Thor at
+  the end of the session with the user's config.ini restored byte for byte. The upstream merge
+  moved the active `arm64-v8a` RelWithDebInfo CMake hash from `5h1x5ud1` to `1qa67114`. The
+  profiling hash `b542p143` and the obsolete `5h1x5ud1` tree were removed after the Gradle daemon
+  was stopped: 6,470,640,220 bytes reclaimed. Only `1qa67114` remains under `.cxx/RelWithDebInfo`.
