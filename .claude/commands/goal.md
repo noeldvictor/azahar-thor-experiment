@@ -1,83 +1,63 @@
 ---
-description: Run the Medarot 9 performance goal on the AYN Thor. Full speed at 2x to 4x with fast-forward working, reached through code efficiency work (NEON, Vulkan, rasterizer cache).
+description: Run the two-title performance goal on the AYN Thor. Measure the native frame rate of Medarot 9 and E.X. Troopers at full speed, fix emulator inefficiencies found on the way, and add a 30 FPS patch code for a title that caps itself at 20 FPS.
 ---
 
-# Goal: Medarot 9 at 2x to 4x, full speed, fast-forward working
+# Goal: Medarot 9 and E.X. Troopers at full speed, with 30 FPS patch codes where the game caps itself lower
 
-## Target
+## Titles
 
-- Title: Medarot 9 Kuwagata with the English patch. Title id `0004000000174F00`.
-- File: `zcci/Medabots9-KWG-1007 [0004000000174F00] [UNK].zcci` under the granted ROM tree.
-- The game presents at 20 FPS by design. Full speed means the overlay shows `Speed: 100%` at 20 FPS.
+| Title | Title id | File under the granted ROM tree | Per-title profile |
+|---|---|---|---|
+| Medarot 9 Kuwagata, English patch | `0004000000174F00` | `zcci/Medabots9-KWG-1007 [0004000000174F00] [UNK].zcci` | none |
+| E.X. Troopers, English patch v1.0.2 | `0004000000053700` | `zcci/E.X. Troopers (Japan) [T-En by Fan Translators International v1.0.2].zcci` | `GameSettings/0004000000053700.ini` forces 2x and a 100% limit |
 
-Success has four parts:
+## Success
 
-1. Speed 100% at resolution factor 2, 3, and 4 in the intro street scene and in a battle.
-2. Fast-forward with `frame_limit = 300` reaches at least 280% at 4x. At 3x it reaches 286% today. That is the Eco Turbo 60 FPS presentation cap for a 20 FPS title.
-3. The gain comes from code: NEON paths, Vulkan submission, or the rasterizer cache. A settings change does not count.
-4. Every change follows AGENTS.md: a correctness argument, an `arm64-v8a` build, and a matched before and after measurement on the Thor.
+1. For each title, the native frame rate at full speed is known per scene: title, menu, cutscene, gameplay. Full speed means the overlay shows `Speed: 100%`.
+2. Each title holds full speed at 2x, 3x, and 4x in gameplay. Where it does not, the cause is measured and recorded, and a code change is attempted and measured.
+3. A title that waits three vsyncs per frame by its own design gets a 30 FPS patch code as a bundled cheat under `src/android/app/src/main/assets/cheats/<title id>.txt`, verified on the Thor for speed and for game pacing. Medarot 9 has the code but fails the pacing check; see its status.
+4. Every emulator change follows AGENTS.md: a correctness argument, an `arm64-v8a` build, and a matched before and after measurement on the Thor. A patch code is guest-code patching and is recorded as a cheat, not as an optimization.
 
-## Status on 2026-09-17
+## Status on 2026-09-18
 
-Parts 1 and 2 hold at 2x and 3x. At 4x, normal speed holds 19.8 FPS but with a P95 interval of
-84 ms, and fast-forward stops near Speed 150%. The cause is known and it is not a renderer
-defect. See "Root cause" below. No accepted code change came out of the first session. The
-ledger entries are in AGENTS.md and in the 2026-09-17 entry of docs/thor-optimization-notes.md.
+### Medarot 9
 
-## Baseline
+- Presents at 20 FPS by design in the title screen, the intro, and the street dialog. Speed 100% at 2x and 3x. At 4x, normal speed holds 19.8 FPS with a P95 interval of 84 ms and fast-forward stops near Speed 150%.
+- Root cause of the 4x limit: the game copies its rendered 400x240 RGB8 top framebuffer with the CPU every frame from a loop at guest PC `0x004008C0`. The first 4-byte read flushes the whole dirty surface: one 384 KiB download and one GPU finish per frame. CPU and GPU never overlap. At 4x the GPU frame is about 11 ms.
+- A dirty-free-span fast path for the remaining reads was measured and rejected. See AGENTS.md.
+- 30 FPS code: found and tested. The caller at `0x003D8268` loads the vsync target (3) with `ldrh r1, [r4, #0x4e]`; the bundled cheat `30 FPS - game speed 1.5x - experimental` replaces it with `mov r1, #2`. The title then presents at a locked 30 FPS at Speed 100%. The game logic is frame-stepped, so it runs 1.5 times faster; the intro that takes 6 s at 20 FPS takes 4 s at 30 FPS. The two float constants near the main module (20.0 and 0.05) are not the step. A finished patch needs the frame-counted timers found and scaled, which is open.
 
-Production build `31e455c30-vanilla-thor`, Turnip R8, performance mode 2, fan mode 4, brightness
-255, USB power. Scene: the intro street dialog after New Game. FPS and P95 come from
-SurfaceFlinger. GPU busy is the KGSL node at 615 MHz. Thread time is the NativeEmulation thread
-as percent of one core.
+### E.X. Troopers
 
-| Resolution | Limit | FPS | P95 interval | GPU busy | Thread user / sys | Overlay |
-|---|---|---|---|---|---|---|
-| 2x | 100% | 19.9 | 50.6 ms | 7.8% | 23% / 1% | Speed 100% |
-| 2x | 300% | 52.3 | 33.7 ms | 23.0% | 65% / 1% | about 260% |
-| 3x | 100% | 19.9 | 50.6 ms | 13.2% | 24% / 1% | Speed 100% |
-| 3x | 300% | 57.9 | 16.9 ms | 38.5% | 64% / 0% | Speed 286% |
-| 4x | 100% | 19.8 | 84.2 ms | 20.6% | 23% / 21% | Speed 100% |
-| 4x | 300% | 30.3 | 50.5 ms | 32.1% | 36% / 30% | Speed 156%, frame 10.8 ms |
-
-## Root cause
-
-- The game copies its rendered 400x240 RGB8 top framebuffer with the CPU every frame. The loop
-  runs at guest PC `0x004008C0`. The first 4-byte read of a frame hits the dirty surface.
-- `RasterizerCache::FlushRegion` treats a request of 8 bytes or less as a CPU read and flushes
-  the whole dirty region: one 384 KiB download and one GPU finish per frame.
-- The finish waits for the frame's draws, which the scheduler submits only at that moment. The
-  CPU and the GPU never overlap. The frame time is CPU work plus GPU work.
-- At 3x the GPU frame is about 6.7 ms. At 4x it is about 11 ms. That is the 4x fast-forward limit.
-- The remaining 72,000 reads of the frame take the slow path for cached pages. A fast path that
-  skipped the dirty lookup for them changed nothing measurable, so the slow path is not the cost.
+- Videos present at 30 FPS at Speed 100% with the GPU near idle.
+- The save-slot and episode screens present at 60 FPS at Speed 100%, but the GPU is at 99.9% busy at 2x and presentation drops to a mix of 60 and 30 FPS frames. The GSP command time is 4.7 ms per frame there. This is the efficiency target for this title; the frame profiler counters decide what the GPU is doing.
+- Engine scenes (the launch scene after the intro videos, about six minutes in) present at 60 FPS
+  at Speed 100%, frame 10.1 ms, GSP command time 4.7 ms, GPU busy 62.6% at 2x. This title needs
+  no frame-rate patch. Its target is GPU efficiency: at 3x the same scene would exceed the GPU.
+- Bug: opening the game's pause menu during a video freezes emulation. The VulkanWorker thread then spins on `dequeueBuffer timed out`. Reproduced twice. Avoid START during videos until fixed. Record it in the ledger.
+- The hack list already forces `SKIP_TEXTURE_COPY_FALLBACK` for this title. The same key in the per-title ini is redundant.
 
 ## Procedure
 
-1. Call `state` on the `thor` MCP server. Record `performance_mode`, `fan_mode`, and `screen_brightness`. Restore them at the end.
-2. Back up config.ini with `config_read`. Set `Layout.performance_overlay_show_speed` and `Layout.performance_overlay_show_frame_time` to `true` with `config_set`.
-3. Call `launch` with the rom path and `wait_seconds = 16`. Then `press("START")`, wait 3 s, `press("A")`, wait 10 s. The game is then in the intro street dialog scene.
-4. Measure with `screenshot`, `fps`, `gpu`, `threads`, and `emulation_thread_time`. Repeat for `Renderer.resolution_factor` 2, 3, and 4, and for `Renderer.frame_limit` 100 and 300. Relaunch after each config change. A control build and a candidate build must run the same matrix in the same session.
-5. For counters, build with `-PthorFrameProfiling=true`, install with `install`, and read `frame_profile`. Never use that build for a speed claim.
-6. Change code in the ranked path. Build the production APK. Run the matrix again. Accept only a matched improvement.
-7. Reach a battle and repeat step 4 there. Hold A through dialog with `press("A")`.
-8. Record the result: the rule in AGENTS.md and the dated measurement in docs/thor-optimization-notes.md.
-9. Restore config.ini. Delete temporary GameSettings files. Restore the device settings. Remove scratch files and stale build hashes. Report the bytes reclaimed.
-
-## Next candidates
-
-1. After a small CPU read has flushed a whole GPU surface, unregister that surface so that its
-   pages become uncached. This mirrors the CPU-write path in `InvalidateRegion`. The remaining
-   reads of the frame then take the fast memory path. Risk: the surface is recreated each frame,
-   and a 384 KiB upload follows if the game does not clear the buffer with a memory fill.
-2. Submit recorded draws before the read so that the GPU starts earlier. The gain is bounded by
-   the 2 ms recording window per frame.
-3. Measure a battle scene. The intro street dialog may not be the heaviest scene.
+1. Call `state` on the `thor` MCP server. Record `performance_mode`, `fan_mode`, and `screen_brightness`. Restore them at the end. Keep the screen on with `svc power stayon usb` and set it back to `false` at the end. A screen timeout pauses the app and leaves it in a bad state.
+2. Back up config.ini with `config_read`. Set `Layout.performance_overlay_show_speed` and `Layout.performance_overlay_show_frame_time` to `true` with `config_set`. For E.X. Troopers, the per-title ini overrides the resolution and the limit; edit it with `game_settings_set` for the matrix and restore it after.
+3. Launch with `launch` and `wait_seconds = 30`. Advance with held `press("A")`. Use `press("START")` only where the title needs it, and never during an E.X. Troopers video.
+4. Measure each scene with `screenshot`, `fps`, `gpu`, `threads`, and `emulation_thread_time`. Run the six-config matrix (2x, 3x, 4x at 100% and 300%) for gameplay. A control build and a candidate build must run the same matrix in the same session.
+5. For counters, build with `-PthorFrameProfiling=true`, install with `install`, read `frame_profile`. Never use that build for a speed claim.
+6. Emulator change: change code in the ranked path, build the production APK, run the matrix again, accept only a matched improvement.
+7. 30 FPS patch, per title that waits three vsyncs per frame:
+   1. Read the wait trace from `logcat` (`THORDIAG gsp wait`). Note the link registers that recur once per frame and the dumped code words.
+   2. Disassemble the dump with capstone (`python -c "import capstone"` works on this PC) in ARM mode, and in Thumb mode if the link register is odd. Find the compare or the constant that holds the vsync count.
+   3. Write a Gateshark code that writes the new constant to that address. Put it in the bundled cheats file for the title with a clear name such as `30 FPS`.
+   4. Enable the cheat, relaunch, and measure. Check pacing: a battle timer, an animation, or the play-time clock against a stopwatch. If the game runs 1.5 times too fast, find the logic timer and patch it too, or drop the code.
+8. Record results: rules in AGENTS.md, dated measurements in docs/thor-optimization-notes.md, cheats under the assets folder.
+9. Restore config.ini and the per-title ini. Restore the device settings and the screen-on state. Remove scratch files and stale build hashes. Report the bytes reclaimed.
 
 ## Known facts
 
 - Send button presses with `hold = true`. The guest reads input once per frame. A short tap is missed.
-- The launch URI must use the tree form. The document form crashes the app with a `SecurityException` in `EmulationFragment.onCreate`. That crash is a separate robustness bug.
+- The launch URI must use the tree form. The document form crashes the app with a `SecurityException` in `EmulationFragment.onCreate`.
 - `Compatibility.skip_texture_copy_fallback` in a GameSettings file has no effect. `src/video_core/gpu.cpp` sets that value from the hack list with a `false` default.
-- `disable_right_eye_render` changes nothing for this title. It does not render a second eye.
+- `disable_right_eye_render` changes nothing for Medarot 9.
 - A profiling build carries timing overhead. Never use it for FPS, power, or thermal claims.
+- A wake sequence with the MENU key while the screen is off brings the secondary-display launcher over the app and the present loop does not recover. Keep the screen on instead.

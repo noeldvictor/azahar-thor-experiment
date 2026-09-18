@@ -9119,3 +9119,73 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   moved the active `arm64-v8a` RelWithDebInfo CMake hash from `5h1x5ud1` to `1qa67114`. The
   profiling hash `b542p143` and the obsolete `5h1x5ud1` tree were removed after the Gradle daemon
   was stopped: 6,470,640,220 bytes reclaimed. Only `1qa67114` remains under `.cxx/RelWithDebInfo`.
+
+## 2026-09-18 E.X. Troopers First Measurements and the Pause-Menu Freeze
+
+- Setup as on 2026-09-17: production build `f0ac9bad4-vanilla-thor` with the debug-log change,
+  Turnip R8, performance mode 2, fan mode 4, brightness 255, USB power. The per-title profile
+  forces 2x and a 100% limit for this title. Screen kept on with `svc power stayon usb`.
+- Intro video: 30 FPS, Speed 100%, frame 8.2 ms, GPU busy 6.8%, emulation thread about 48% of
+  one core. Save-slot and episode screens: 60 FPS, Speed 100%, frame 9.3 ms, GSP command time
+  4.7 ms, GPU busy 99.9%, SurfaceFlinger mean 39.4 FPS with intervals of 16.9 ms and 33.7 ms.
+  Later videos: 30 FPS locked at 33.7 ms, GPU 7%, thread 40% to 56%. Gameplay: not reached in
+  six minutes of videos.
+- Freeze: a held START during a video opened the game's pause menu (overlay Speed 96%, 37 FPS),
+  then the frame stopped changing. Thread states: all NativeEmulation threads S, VulkanWorker S
+  between spins, VulkanPresent S. The log held 19,923 lines of `dequeueBuffer timed out:
+  Function not implemented (-38)` from the VulkanWorker thread and nothing else. Reproduced twice.
+  A first freeze at the Capcom logo happened after the screen timed out during a launch and a
+  MENU key wake brought the secondary-display launcher to the front; that one is a device-state
+  case, the pause-menu one is not.
+- No emulator change was made for this title yet. No power or thermal claim is made.
+- Engine scene reached after about six minutes of intro videos and A presses: 60 FPS, Speed 100%,
+  frame 10.1 ms, GSP command time 4.7 ms, remainder 5.2 ms, GPU busy 62.6% at 2x, SurfaceFlinger
+  59.3 FPS with 16.9 ms P95. The name-entry screen before it: 49.5 FPS mean with GPU busy 99.9%.
+  E.X. Troopers therefore runs at 60 FPS in engine scenes and 30 FPS in videos by design; no
+  frame-rate patch applies. The open question for this title is why 2x rendering of a 400x240
+  scene costs about 10 ms of Adreno 740 time per frame.
+- Frame profiler on the E.X. Troopers save-slot screen (profiling build, 2x, 300-swap window of
+  5.21 s): draw batches 241,759 of which 80,404 accelerated and 161,355 software, all software
+  fallbacks tagged `gs` (a geometry-shader mode the Vulkan backend does not accelerate);
+  render pass begins 221 per swap with 236 image barriers at render pass ends per swap; display
+  transfers 2,896 at 1,001 Mpix; validation copies 1,448 at 166 Mpix; presents 598 direct;
+  scheduler submits 2 per swap, waits 0.16 ms per swap, no downloads, no finishes. KGSL busy
+  99.9% at 43.6 presented FPS. Reading: two thirds of the draws run their vertex stage on the
+  CPU, and the render-target switching forces about 440 render passes per frame, which a tiled
+  GPU pays for with a full tile store and load each time. Both are large projects: hardware
+  geometry-shader acceleration for that mode, and render pass merging across dependent targets.
+
+## 2026-09-18 Medarot 9 Frame Pacing Located and a 30 FPS Code Tested
+
+- Method: a temporary kernel trace logged the guest PC and link register at every blocking wait,
+  every address arbitration, and a code dump around each new link register, plus an on-demand
+  memory dump driven by a request file. The main thread waits on a light event at `0x00487CA4`
+  61 times per second. Its wait wrapper returns to `0x00234690`, which returns into the frame
+  function at `0x0040084C` at two sites: `0x004009FC` once per frame and `0x00400A2C` twice.
+- The frame function takes the vsync target in `r1`. It reads the vblank count, waits once, then
+  waits until the target is reached, and stores the count read before the last wait, so the last
+  wait counts as elapsed for the next frame. The caller at `0x003D8268` loads the target with
+  `ldrh r1, [r4, #0x4e]` (word `E1D414BE`) from the game object, and the value is 3.
+- Code: `D3000000 00000000` then `003D8268 E3A01002` replaces that load with `mov r1, #2`.
+  With it enabled the title screen and the intro present at a locked 30 FPS (SurfaceFlinger
+  median 33.72 ms, P95 33.72 ms) at Speed 100% with 8.2 ms of work per frame.
+- Pacing check: one screenshot per second after the New Game press, mean luminance of the
+  dialog-box region. At 20 FPS the bright school scene spans seconds 3 to 8 and the dialog box
+  appears at second 9. At 30 FPS the bright scene spans seconds 3 to 5 and the dialog box appears
+  at second 7. The game logic advances per frame, so the code runs the game about 1.5 times too
+  fast. The code is bundled with that fact in its name and is not a finished 30 FPS patch. A
+  finished patch needs the logic step scaled; the frame function stores an elapsed-vblank count at
+  object offset `0x104` and a float at `0x108`, which are the first candidates.
+- A full dump of `0x00100000` to `0x00500000` was taken for offline analysis.
+- Constant check from the code dump: `20.0f` at `0x3DCCE0` is loaded at `0x003DCB9C` as a
+  comparison threshold in a float smoothing routine, and `0.05f` at `0x3DD428` is loaded at
+  `0x003DD074` to scale a 16-bit size. Neither is the logic step. No `1/30` or `1/60` literal
+  exists in the region. The logic step is therefore not a single constant.
+- Final state: the kernel trace was reverted before the production build; the cheat file is on the
+  device in its disabled bundled form; config.ini was restored byte for byte; the screen-on
+  setting was set back to false.
+- The production APK installed at the end of this session carries the bundled cheat and no
+  diagnostics: 29179911 bytes, SHA-256 `1265C19B9939E9F92D88C96E7FC1876838111AAEDCAB07042E8A0B56A50E28FA`. A sanity launch of Medarot 9 with the cheat disabled
+  presented at 20 FPS and the profiling counters were absent.
+- Cleanup: the profiling hash `b542p143` was removed after the Gradle daemon was stopped,
+  3,225,522,870 bytes reclaimed. Only `1qa67114` remains under `.cxx/RelWithDebInfo`.

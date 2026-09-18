@@ -1540,3 +1540,35 @@
   the app holds a grant for; the plain document URI crashes `EmulationFragment.onCreate` with a
   `SecurityException`. Install A/B builds with `adb install -r -d`; the working tree's version
   code is newer than any kept control APK.
+- E.X. Troopers (`0004000000053700`, English patch v1.0.2) on 2026-09-18: videos present at 30 FPS
+  at Speed 100% with the GPU near idle. The save-slot and episode screens present at 60 FPS at
+  Speed 100%, but KGSL GPU busy is 99.9% at 2x and SurfaceFlinger shows a mix of 16.9 ms and
+  33.7 ms intervals, so presentation drops frames there. The GSP command time on those screens is
+  about 4.7 ms per frame. Treat that screen as the efficiency target for this title and rank it
+  from the frame profiler counters before changing code. Gameplay was not reached within the
+  first six minutes of intro videos.
+- Bug, open: opening the E.X. Troopers pause menu during a video freezes emulation. The overlay
+  stops updating, every NativeEmulation thread sleeps, and the VulkanWorker thread logs
+  `dequeueBuffer timed out: Function not implemented (-38)` in a loop. Reproduced twice in one
+  session. The log buffer filled with that line, so the trigger context was lost; reproduce with
+  `logcat -G 64M` and a filter that drops the timeout line before reading the fork's own
+  presentation messages. Until it is fixed, do not press START during an E.X. Troopers video.
+- Device automation facts added 2026-09-18: a screen timeout pauses the app and a wake sequence
+  with the MENU key while the screen is off brings the secondary-display launcher over the app;
+  the present loop then spins on the same `dequeueBuffer` timeout. Keep the screen on with
+  `svc power stayon usb` during a session and set it back to `false` at the end. Send A presses to
+  advance videos and dialogs; START pauses.
+- E.X. Troopers efficiency ranking from the profiler (2026-09-18): 67% of draws take the software
+  vertex path because of a geometry-shader mode that `RasterizerVulkan::AccelerateDrawBatch`
+  refuses, and the renderer begins about 221 render passes per swap with 236 image barriers.
+  Those two facts, not shader cost, saturate the Adreno 740 at 2x on the menu screens. Any work
+  on this title starts with one of them and must be measured with the counters above.
+- Medarot 9 30 FPS code (2026-09-18): `src/android/app/src/main/assets/cheats/0004000000174F00.txt`
+  holds `30 FPS - game speed 1.5x - experimental` and a 60 FPS variant, both disabled by default.
+  They replace `ldrh r1, [r4, #0x4e]` at `0x003D8268` (word `E1D414BE`), the load of the vsync
+  target 3 passed to the frame function at `0x0040084C`, with `mov r1, #2` or `mov r1, #1`. The
+  frame rate follows, but the game logic is frame-stepped and runs proportionally faster. Do not
+  present these as a finished patch. Finding and scaling the frame-counted timers is the open
+  step. The method that located the pacing loop, a kernel trace of blocking waits and address
+  arbitration with an on-demand memory dump, is recorded in the notes and is temporary code, not
+  a feature.
