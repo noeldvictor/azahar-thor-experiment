@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "thor": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["tools/thor-mcp/server.py"],
+      "env": {
+        "THOR_SERIAL": "c3ca0370",
+        "THOR_PACKAGE": "org.azahar_emu.azahar.debug",
+        "THOR_USER_DIR": "/storage/emulated/0/Azaharuser",
+        "THOR_ROM_TREE": "2664-21DE:Roms/n3ds"
+      }
+    }
+  }
+}

@@ -65,3 +65,6 @@ GIT-TAG
 
 # verify-release.sh downloads
 verify/
+
+# Local device captures from tools/thor-mcp
+thor-captures/

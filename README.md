@@ -111,6 +111,14 @@ used for FPS, power, or thermal comparisons.
   generic Turnip first, recent Turnip rollback builds, Qualcomm and Turnip variants for
   troubleshooting, manual ZIP install, and system-driver fallback.
 
+### Device Control
+
+- `tools/thor-mcp/server.py` is an MCP server that controls the Thor over ADB. It reads device
+  state, edits config.ini and per-title ini files, launches a title, sends held button presses,
+  captures both panels, measures frame pacing from SurfaceFlinger, samples GPU busy and per-thread
+  CPU time, and reads the log. `.mcp.json` starts it for Claude Code.
+- `.claude/commands/goal.md` holds the current performance goal and its device procedure.
+
 ### Guards
 
 - Missing or stale ROM entries stop before launch instead of continuing into emulation.
@@ -169,7 +177,10 @@ validation. Cheat coverage gaps are tracked in [docs/thor-cheat-gaps.md](docs/th
 - [docs/thor-optimization-notes.md](docs/thor-optimization-notes.md) holds the dated evidence
   behind those rules.
 - [docs/thor-cheat-gaps.md](docs/thor-cheat-gaps.md) tracks cheat coverage gaps.
-- [CLAUDE.md](CLAUDE.md) carries the working rules for AI agents in this repository.
+- [CLAUDE.md](CLAUDE.md) carries the working rules for AI agents in this repository, the device
+  control tools, and the writing standard for all English in this repository.
+- [.claude/commands/goal.md](.claude/commands/goal.md) is the current performance goal with its
+  baseline and procedure.
 - [AI-POLICY.md](AI-POLICY.md) states how AI assistance is used here.
 
 ## Support
