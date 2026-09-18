@@ -546,6 +546,116 @@ def push(local: str, remote: str) -> str:
     return f"pushed {local} -> {remote}"
 
 
+@mcp.tool()
+def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25) -> str:
+    """Run one maintenance operation inside the app on its private driver directories and return
+    the JSON result. The app reads thor_maintenance.txt from the user directory at startup, runs
+    the operation, writes log/thor_maintenance.json, and deletes the request. Nothing outside the
+    app's own storage is touched. Ops: list (private files tree), verify (hash the extracted GPU
+    driver against its zip), clear_redirect (delete the driver's file redirect directory),
+    reinstall_driver (re-extract the selected or the given zip from gpu_drivers), system_driver
+    (switch to the system Vulkan driver). The app is stopped before and after."""
+    ops = {"list", "verify", "clear_redirect", "reinstall_driver", "system_driver"}
+    if op not in ops:
+        raise ValueError(f"op must be one of {sorted(ops)}")
+    stop()
+    result_remote = f"{USER_DIR}/log/thor_maintenance.json"
+    _sh(f"rm -f '{result_remote}'")
+    _write_remote_text(f"{USER_DIR}/thor_maintenance.txt", op + ("\n" + zip_name if zip_name else "") + "\n")
+    _sh(f"am start -W -n {PACKAGE}/org.citra.citra_emu.ui.main.MainActivity", timeout=60)
+    deadline = time.time() + wait_seconds
+    text = ""
+    while time.time() < deadline:
+        try:
+            text = _read_remote_text(result_remote)
+            if text.strip():
+                break
+        except RuntimeError:
+            pass
+        time.sleep(1)
+    stop()
+    if not text.strip():
+        raise RuntimeError("the app wrote no result; check that the user directory is granted")
+    return text
+
+
+@mcp.tool()
+def gpu_faults(max_bursts: int = 12) -> dict:
+    """Count Adreno command-processor faults ('CP: AHB bus error') in the kernel log and map each
+    burst to wall-clock time through the audit lines, which carry both clocks. A burst is a run
+    of fault lines separated by more than 20 seconds. A GPU fault stalls the Vulkan swapchain and
+    the app spins on 'dequeueBuffer timed out'."""
+    now = _sh("date +%s; date +%H:%M:%S").split()
+    epoch_now, local_now = float(now[0]), now[1]
+    text = _sh("dmesg 2>/dev/null | grep -E 'AHB bus error|audit\(' | tail -6000")
+    anchor = None
+    for line in text.splitlines():
+        m = re.match(r"\[\s*([0-9.]+)\].*audit\(([0-9.]+):", line)
+        if m:
+            anchor = (float(m.group(1)), float(m.group(2)))
+    h, mi, sec = (int(x) for x in local_now.split(":"))
+    local_secs = h * 3600 + mi * 60 + sec
+
+    def wall(ts: float) -> str:
+        if anchor is None:
+            return f"kernel+{ts:.0f}s"
+        l = (local_secs + (ts - anchor[0] + anchor[1] - epoch_now)) % 86400
+        return "%02d:%02d:%02d" % (l // 3600, (l % 3600) // 60, l % 60)
+
+    total = 0
+    prev = None
+    bursts: list[dict] = []
+    for line in text.splitlines():
+        if "AHB bus error" not in line:
+            continue
+        total += 1
+        ts = float(re.match(r"\[\s*([0-9.]+)\]", line).group(1))
+        if prev is None or ts - prev > 20:
+            bursts.append({"start": wall(ts), "lines": 1})
+        else:
+            bursts[-1]["lines"] += 1
+        prev = ts
+    return {"total_lines": total, "bursts": bursts[-max_bursts:], "device_time": local_now}
+
+
+@mcp.tool()
+def ui_dump(display: int = 0, max_nodes: int = 80) -> list[dict]:
+    """Dump the visible UI of a display with uiautomator and return the nodes that have text, a
+    content description, or a resource id, with their center points. Use ui_tap to press one."""
+    remote = "/sdcard/thor_ui_dump.xml"
+    _sh(f"uiautomator dump --display-id {display} {remote} >/dev/null 2>&1 || uiautomator dump {remote} >/dev/null 2>&1", timeout=60)
+    xml = _read_remote_text(remote)
+    nodes = []
+    for m in re.finditer(r"<node [^>]*?/?>", xml):
+        attrs = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+        text = attrs.get("text", "")
+        desc = attrs.get("content-desc", "")
+        rid = attrs.get("resource-id", "")
+        if not (text or desc or rid):
+            continue
+        b = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", attrs.get("bounds", ""))
+        center = [(int(b.group(1)) + int(b.group(3))) // 2, (int(b.group(2)) + int(b.group(4))) // 2] if b else None
+        nodes.append({"text": text, "desc": desc, "id": rid.split("/")[-1], "center": center,
+                      "clickable": attrs.get("clickable") == "true"})
+        if len(nodes) >= max_nodes:
+            break
+    return nodes
+
+
+@mcp.tool()
+def ui_tap(text: str, display: int = 0) -> str:
+    """Find a UI node whose text, description, or resource id contains the given text (case
+    insensitive) and tap its center. Raises if no node matches."""
+    wanted = text.lower()
+    for node in ui_dump(display, max_nodes=400):
+        hay = " ".join([node["text"], node["desc"], node["id"]]).lower()
+        if wanted in hay and node["center"]:
+            x, y = node["center"]
+            _sh(f"input -d {display} tap {x} {y}")
+            return f"tapped '{node['text'] or node['desc'] or node['id']}' at {x},{y}"
+    raise RuntimeError(f"no UI node matches '{text}'")
+
+
 def _main() -> None:
     if "--list-tools" in sys.argv:
         for tool in asyncio.run(mcp.list_tools()):

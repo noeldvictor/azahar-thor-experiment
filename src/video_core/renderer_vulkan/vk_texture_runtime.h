@@ -359,6 +359,16 @@ public:
         return render_pass;
     }
 
+    /// Width of the framebuffer in scaled pixels: the smallest attachment width
+    u32 Width() const noexcept {
+        return width;
+    }
+
+    /// Height of the framebuffer in scaled pixels: the smallest attachment height
+    u32 Height() const noexcept {
+        return height;
+    }
+
     u32 Scale() const noexcept {
         return res_scale;
     }

@@ -11,6 +11,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import org.citra.citra_emu.utils.DirectoryInitialization
+import org.citra.citra_emu.utils.ThorMaintenance
 import org.citra.citra_emu.utils.DocumentsTree
 import org.citra.citra_emu.utils.GraphicsUtil
 import org.citra.citra_emu.utils.Log
@@ -53,6 +54,8 @@ class CitraApplication : Application() {
         documentsTree = DocumentsTree()
         if (PermissionsHandler.hasWriteAccess(applicationContext)) {
             DirectoryInitialization.start()
+            // Thor MCP maintenance: runs one request from thor_maintenance.txt, if present.
+            ThorMaintenance.runPendingRequest(applicationContext)
         }
 
         NativeLibrary.logDeviceInfo()

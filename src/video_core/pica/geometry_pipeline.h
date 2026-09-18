@@ -38,6 +38,9 @@ public:
     /// Checks if the pipeline needs a direct input from index buffer
     bool NeedIndexInput() const;
 
+    /// Checks if the pipeline holds no buffered vertex for the next geometry invocation
+    bool IsEmpty() const;
+
     /// Submits an index from index buffer. Call this only when NeedIndexInput returns true
     void SubmitIndex(unsigned int val);
 

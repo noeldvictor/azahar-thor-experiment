@@ -9226,3 +9226,46 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   diagnostics, 29179895 bytes, SHA-256 `2F68B6F0DC3DA8F7FD8BC6D1482FFDD8FFAAD219CF5E62F5EC79CF70A29C460C`. Sanity launch with the cheats disabled presented at
   20 FPS with no diagnostic lines in the log. config.ini restored byte for byte; screen-on
   setting reset to false; performance mode 2, fan mode 4, brightness 255 unchanged.
+
+## 2026-09-18 E.X. Troopers Geometry Expansion, Pass Restart Reasons, and a Device Fault
+
+- Geometry program dump (temporary command processor log, removed): three point-mode programs
+  at main offsets 0x2E, 0x3C, and 0x58, shader topology, one vertex per invocation, outputs
+  o0 to o2 mapped to position, color, and texcoord0. Program 0x2E is a sprite expander: two
+  branches, four quads, no loops, no address registers, uniforms f[80] and f[95]. Programs 0x58
+  and 0x3C share code. Their first invocation of a draw stores gs_in[4] to gs_in[7] in registers
+  11 to 14 and parameters in registers 10 and 15, then ends; later invocations read those
+  registers. That is state kept between invocations.
+- Fused vertex shader: the decompiler gained identifier prefixes, a uniform block name, and
+  EMIT/SETEMIT translation (`DecompileOptions`); `GenerateGeometryExpandedVertexShader` runs
+  the vertex program, feeds the geometry program, and keeps corner `v % 3` of primitive
+  `v / 3`; unused host vertices go to clip position (2, 2, 2, 1). Winding follows the software
+  assembler: a primitive emit with the winding flag sends (slot 1, slot 0, slot 2).
+- Profiler on the save-slot screen at 2x, 300-swap windows, geometry build: draw batches
+  193,042; accelerated 182,994 (94.79%); software 10,048, all program 0x58; expanded geometry
+  draws 93,773. Control window the same day: 33.49% accelerated. Frame pacing 40.5 FPS mean and
+  GPU busy 99.9% in both. Pass restarts per swap unchanged: begins 251, color switch 139.5,
+  depth toggle 27.9, area shrink 16.7, area other 27.9. Reading: the draw path is no longer the
+  cost on this screen; the tile loads and stores of about 250 passes per swap are.
+- Render target switch sequence (temporary log, removed) in the early phase: color surface
+  0x180D4800 with depth 0x183FD400 for 14 draws, then the same color without depth for one
+  draw, then with depth, then color 0x18070800 without depth for one draw, then back. All are
+  256x512 RGBA8 surfaces drawn through 248x400 or 240x400 viewports.
+- Device fault timeline. Kernel bursts of `CP: AHB bus error` (details 0x10008e07/0x12144) at
+  09:01, 12:11, 12:39, then at 12:44 and at every Vulkan launch after it, one to three seconds
+  in, for E.X. Troopers, Medarot 9, and Bravely Default, on candidate builds and on the
+  production control (version a8aef3a21). While the app is stalled the errors repeat in groups
+  of ten every five seconds; they stop when the app is stopped. After a warm reboot the first
+  launch faulted again. OpenGL launched E.X. Troopers through its intro with zero new lines.
+  Checked and unchanged: config.ini (412 bytes, equal to the backup), the per-title ini, every
+  file under the user directory (nothing modified since 12:38), the extracted Turnip R8 driver
+  (SHA-256 fdd378...de09, equal to the zip entry), the redirect directory (empty), the ROM
+  (SHA-256 4e5512...c688 twice), temperatures 45 to 55 C, thermal_pwrlevel 0, performance mode
+  2 and fan mode 4, GPU debug layers off, no tracing session, both panels on. The performance
+  mode only moves `min_pwrlevel` (1 in mode 2, 4 in mode 0); `ifpc`, `force_no_nap`, and the
+  other power nodes are root-only. The next test is a full power-off of the handheld, which a
+  warm reboot does not replace.
+- New MCP tools: `app_maintenance`, `gpu_faults`, `ui_dump`, `ui_tap`. The maintenance channel
+  is a request file in the user directory read at app startup; an exported receiver was
+  rejected as too wide a surface.
+- Cleanup: the temporary logs in the rasterizer are removed; the pass merging switches stay off.

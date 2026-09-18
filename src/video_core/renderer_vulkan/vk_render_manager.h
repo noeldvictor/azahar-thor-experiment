@@ -51,6 +51,16 @@ public:
     /// Exits from any currently active renderpass instance
     void EndRendering();
 
+    /// Returns true while a renderpass instance is open
+    bool HasActivePass() const noexcept {
+        return pass.render_pass != VK_NULL_HANDLE;
+    }
+
+    /// Returns the images of the open renderpass: color first, then depth
+    const std::array<vk::Image, 2>& ActiveImages() const noexcept {
+        return images;
+    }
+
     /// Returns the renderpass associated with the color-depth format pair
     vk::RenderPass GetRenderpass(VideoCore::PixelFormat color, VideoCore::PixelFormat depth,
                                  bool is_clear);
@@ -66,6 +76,10 @@ private:
     vk::UniqueRenderPass cached_renderpasses[NumColorFormats + 1][NumDepthFormats + 1][2];
     std::mutex cache_mutex;
     std::array<vk::Image, 2> images;
+
+    /// Counts why a new pass could not reuse the current one. Profiling builds only.
+    void ClassifyRestart(const RenderPass& new_pass,
+                         const std::array<vk::Image, 2>& new_images) const;
     std::array<vk::ImageAspectFlags, 2> aspects;
     bool shadow_rendering{};
     RenderPass pass{};

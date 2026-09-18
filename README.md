@@ -116,7 +116,9 @@ used for FPS, power, or thermal comparisons.
 - `tools/thor-mcp/server.py` is an MCP server that controls the Thor over ADB. It reads device
   state, edits config.ini and per-title ini files, launches a title, sends held button presses,
   captures both panels, measures frame pacing from SurfaceFlinger, samples GPU busy and per-thread
-  CPU time, and reads the log. `.mcp.json` starts it for Claude Code.
+  CPU time, and reads the log. It also counts kernel GPU faults (`gpu_faults`), drives the
+  visible UI (`ui_dump`, `ui_tap`), and runs driver-directory maintenance inside the app
+  (`app_maintenance`). `.mcp.json` starts it for Claude Code.
 - `.claude/commands/goal.md` holds the current performance goal and its device procedure.
 
 ### Guards

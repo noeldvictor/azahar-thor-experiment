@@ -10,6 +10,7 @@
 #include "video_core/renderer_vulkan/vk_graphics_pipeline.h"
 #include "video_core/renderer_vulkan/vk_resource_pool.h"
 #include "video_core/renderer_vulkan/vk_shader_disk_cache.h"
+#include "video_core/shader/geometry_expand.h"
 #include "video_core/shader/generator/pica_fs_config.h"
 #include "video_core/shader/generator/profile.h"
 #include "video_core/shader/generator/shader_gen.h"
@@ -38,7 +39,7 @@ enum class DescriptorHeapType : u32 {
 class PipelineCache {
     static constexpr u32 NumRasterizerSets = 3;
     static constexpr u32 NumDescriptorHeaps = 3;
-    static constexpr u32 NumDynamicOffsets = 3;
+    static constexpr u32 NumDynamicOffsets = 4;
 
 public:
     explicit PipelineCache(const Instance& instance, Scheduler& scheduler,
@@ -78,6 +79,17 @@ public:
 
     /// Binds a passthrough vertex shader
     void UseTrivialVertexShader();
+
+    /// Binds a vertex shader that also runs a point-mode PICA geometry program
+    bool UseGeometryExpandedVertexShader(const Pica::RegsInternal& regs,
+                                         Pica::ShaderSetup& vs_setup, Pica::ShaderSetup& gs_setup,
+                                         const VertexLayout& layout,
+                                         const Pica::Shader::GeometryExpandInfo& expand);
+
+    /// Returns true when the bound vertex shader has no disk cache entry
+    bool IsVertexShaderTransient() const noexcept {
+        return vs_transient;
+    }
 
     /// Binds a PICA decompiled geometry shader
     bool UseFixedGeometryShader(const Pica::RegsInternal& regs);
@@ -154,6 +166,7 @@ private:
     std::array<DescriptorHeap, NumDescriptorHeaps> descriptor_heaps;
     std::array<vk::DescriptorSet, NumRasterizerSets> bound_descriptor_sets{};
     std::array<u32, NumDynamicOffsets> offsets{};
+    bool vs_transient{};
 
     std::array<u64, MAX_SHADER_STAGES> shader_hashes;
     std::array<Shader*, MAX_SHADER_STAGES> current_shaders;

@@ -10,6 +10,7 @@
 #include "common/zstd_compression.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
+#include "common/bit_set.h"
 #include "video_core/renderer_vulkan/vk_shader_disk_cache.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
 #include "video_core/shader/generator/glsl_fs_shader_gen.h"
@@ -235,6 +236,76 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFixedGeometrySh
     }
 }
 
+std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseGeometryExpandedVertexShader(
+    const Pica::RegsInternal& regs, Pica::ShaderSetup& vs_setup, Pica::ShaderSetup& gs_setup,
+    const VertexLayout& layout, const Pica::Shader::GeometryExpandInfo& expand) {
+
+    PicaGSExpandVSConfig config{};
+    config.state.vs.Init(regs, vs_setup);
+    config.state.vs.used_input_vertex_attributes = layout.attribute_count;
+    for (u32 i = 0; i < layout.attribute_count; i++) {
+        auto& dst = config.state.vs.input_vertex_attributes[i];
+        const auto& src = layout.attributes[i];
+        dst.location = src.location;
+        dst.type = static_cast<u8>(src.type.Value());
+        dst.size = src.size;
+    }
+
+    // The fragment interface follows the geometry output map, not the vertex output map.
+    const u32 gs_outputs = Common::BitSet<u32>(regs.gs.output_mask).Count();
+    config.state.vs.gs_state.gs_output_attributes_count = gs_outputs;
+
+    auto& gs = config.state.gs;
+    gs.gs_program_hash = gs_setup.GetProgramCodeHash();
+    gs.gs_swizzle_hash = gs_setup.GetSwizzleDataHash();
+    gs.gs_main_offset = regs.gs.main_offset;
+    gs.gs_num_inputs = regs.gs.max_input_attribute_index + 1;
+    gs.gs_num_outputs = gs_outputs;
+    gs.max_vertices = expand.max_vertices;
+    gs.gs_input_map.fill(16);
+    gs.gs_output_map.fill(16);
+    for (u32 k = 0; k < gs.gs_num_inputs && k < 16; ++k) {
+        gs.gs_input_map[k] = static_cast<u8>(regs.gs.GetRegisterForAttribute(k));
+    }
+    u32 packed = 0;
+    for (u32 reg : Common::BitSet<u32>(regs.gs.output_mask)) {
+        gs.gs_output_map[reg] = static_cast<u8>(packed++);
+    }
+
+    // Tag the hash so that it can never collide with a plain vertex shader config hash.
+    const u64 config_hash = config.Hash() ^ 0x4753455850414E44ULL;
+
+    const auto [it, new_shader] = expanded_vertex_shaders.try_emplace(config_hash, parent.instance);
+    auto& shader = it->second;
+
+    if (new_shader) {
+        LOG_NEW_OBJECT(Render_Vulkan, "New expanded VS config {:016X}", config_hash);
+
+        PicaVSConfig vs_config{};
+        vs_config.state = config.state.vs;
+        const ExtraVSConfig extra_config = parent.CalcExtraConfig(vs_config);
+
+        std::string program = GLSL::GenerateGeometryExpandedVertexShader(vs_setup, gs_setup,
+                                                                          config, extra_config);
+        if (program.empty()) {
+            LOG_ERROR(Render_Vulkan, "Failed to generate the expanded vertex shader");
+            expanded_vertex_shaders.erase(config_hash);
+            return {};
+        }
+
+        shader.program = std::move(program);
+        const vk::Device device = parent.instance.GetDevice();
+        parent.shader_workers.QueueWork([device, &shader] {
+            const auto spirv = CompileGLSL(shader.program, vk::ShaderStageFlagBits::eVertex);
+            shader.program.clear();
+            shader.module = CompileSPV(spirv, device);
+            shader.MarkDone();
+        });
+    }
+
+    return std::make_pair(config_hash, &shader);
+}
+
 GraphicsPipeline* ShaderDiskCache::GetPipeline(const PipelineInfo& info) {
 
     u64 hash = info.Hash();
@@ -255,7 +326,7 @@ GraphicsPipeline* ShaderDiskCache::GetPipeline(const PipelineInfo& info) {
             *parent.pipeline_layout, parent.current_shaders, &parent.pipeline_workers);
     }
 
-    if (known_graphic_pipelines.emplace(hash).second) {
+    if (!parent.IsVertexShaderTransient() && known_graphic_pipelines.emplace(hash).second) {
         LOG_NEW_OBJECT(Render_Vulkan, "New Pipeline {:016X}", hash);
 
         PLConfigEntry entry{

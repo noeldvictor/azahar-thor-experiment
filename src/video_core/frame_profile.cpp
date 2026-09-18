@@ -65,11 +65,12 @@ void ReportFrameProfileWindow() {
     LOG_INFO(Render_Vulkan,
              "ThorFrameProfile window_s={:.3f} swaps={} presented={} duplicate_prepare_skipped={} "
              "immediate_vertices={} draw_batches={} accelerated={} accelerated_pct={:.2f} "
-             "software={}",
+             "software={} accelerated_geometry={}",
              seconds, swaps, values[Index(FrameProfileEvent::PresentFrames)],
              values[Index(FrameProfileEvent::DuplicateFramePreparationsSkipped)],
              values[Index(FrameProfileEvent::ImmediateVertices)], draws, accelerated,
-             accelerated_percent, values[Index(FrameProfileEvent::SoftwareDraws)]);
+             accelerated_percent, values[Index(FrameProfileEvent::SoftwareDraws)],
+             values[Index(FrameProfileEvent::AcceleratedGeometryDraws)]);
     LOG_INFO(Render_Vulkan,
              "ThorFrameProfile fallback hw_off={} gs={} primitive_state={} topology={} backend={}",
              values[Index(FrameProfileEvent::FallbackHwShaderDisabled)],
@@ -98,6 +99,18 @@ void ReportFrameProfileWindow() {
              PerSwap(values, FrameProfileEvent::RenderPassEnds, swaps),
              PerSwap(values, FrameProfileEvent::RenderPassImageBarriers, swaps),
              values[Index(FrameProfileEvent::MaliRenderPassFlushes)]);
+    LOG_INFO(Render_Vulkan,
+             "ThorFrameProfile renderpass_restart color_switch_per_swap={:.3f} "
+             "depth_toggle_per_swap={:.3f} same_images_per_swap={:.3f} "
+             "area_shrink_per_swap={:.3f} area_grow_per_swap={:.3f} area_other_per_swap={:.3f} "
+             "clear_per_swap={:.3f}",
+             PerSwap(values, FrameProfileEvent::RenderPassRestartColorSwitch, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartDepthToggle, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartSameImages, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartAreaShrink, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartAreaGrow, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartAreaOther, swaps),
+             PerSwap(values, FrameProfileEvent::RenderPassRestartClear, swaps));
     LOG_INFO(Render_Vulkan,
              "ThorFrameProfile texture upload_per_swap={:.3f} upload_kib_per_swap={:.3f} "
              "custom_uploads={} custom_kib={:.3f} download_per_swap={:.3f} "

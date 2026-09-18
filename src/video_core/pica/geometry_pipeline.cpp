@@ -366,6 +366,13 @@ bool GeometryPipeline::NeedIndexInput() const {
     return backend->NeedIndexInput();
 }
 
+bool GeometryPipeline::IsEmpty() const {
+    if (!backend) {
+        return true;
+    }
+    return backend->IsEmpty();
+}
+
 void GeometryPipeline::SubmitIndex(unsigned int val) {
     backend->SubmitIndex(val);
 }

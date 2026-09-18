@@ -267,10 +267,12 @@ public:
     GLSLGenerator(const std::set<Subroutine>& subroutines, const ProgramCode& program_code,
                   const SwizzleData& swizzle_data, u32 main_offset,
                   const RegGetter& inputreg_getter, const RegGetter& outputreg_getter,
-                  bool sanitize_mul)
+                  const DecompileOptions& options)
         : subroutines(subroutines), program_code(program_code), swizzle_data(swizzle_data),
           main_offset(main_offset), inputreg_getter(inputreg_getter),
-          outputreg_getter(outputreg_getter), sanitize_mul(sanitize_mul) {
+          outputreg_getter(outputreg_getter), sanitize_mul(options.sanitize_mul),
+          prefix(options.prefix), uniform_block(options.uniform_block),
+          geometry(options.geometry) {
 
         Generate();
     }
@@ -280,6 +282,11 @@ public:
     }
 
 private:
+    /// Gets the GLSL function name of a subroutine, with the identifier prefix applied.
+    std::string SubName(const Subroutine& subroutine) const {
+        return prefix + subroutine.GetName();
+    }
+
     /// Gets the Subroutine object corresponding to the specified address.
     const Subroutine& GetSubroutine(u32 begin, u32 end) const {
         auto iter = subroutines.find(Subroutine{begin, end});
@@ -288,13 +295,12 @@ private:
     }
 
     /// Generates condition evaluation code for the flow control instruction.
-    static std::string EvaluateCondition(Instruction::FlowControlType flow_control) {
+    std::string EvaluateCondition(Instruction::FlowControlType flow_control) const {
         using Op = Instruction::FlowControlType::Op;
 
-        const std::string_view result_x =
-            flow_control.refx.Value() ? "conditional_code.x" : "!conditional_code.x";
-        const std::string_view result_y =
-            flow_control.refy.Value() ? "conditional_code.y" : "!conditional_code.y";
+        const std::string cc = prefix + "conditional_code";
+        const std::string result_x = flow_control.refx.Value() ? cc + ".x" : "!" + cc + ".x";
+        const std::string result_y = flow_control.refy.Value() ? cc + ".y" : "!" + cc + ".y";
 
         switch (flow_control.op) {
         case Op::JustX:
@@ -306,9 +312,9 @@ private:
             const std::string_view and_or = flow_control.op == Op::Or ? "any" : "all";
             std::string bvec;
             if (flow_control.refx.Value() && flow_control.refy.Value()) {
-                bvec = "conditional_code";
+                bvec = cc;
             } else if (!flow_control.refx.Value() && !flow_control.refy.Value()) {
-                bvec = "not(conditional_code)";
+                bvec = "not(" + cc + ")";
             } else {
                 bvec = fmt::format("bvec2({}, {})", result_x, result_y);
             }
@@ -329,13 +335,13 @@ private:
         case RegisterType::Input:
             return inputreg_getter(index);
         case RegisterType::Temporary:
-            return fmt::format("reg_tmp{}", index);
+            return fmt::format("{}reg_tmp{}", prefix, index);
         case RegisterType::FloatUniform:
             if (address_register_index != 0) {
-                return fmt::format("get_offset_register({}, address_registers.{})", index,
-                                   "xyz"[address_register_index - 1]);
+                return fmt::format("{0}get_offset_register({1}, {0}address_registers.{2})", prefix,
+                                   index, "xyz"[address_register_index - 1]);
             }
-            return fmt::format("uniforms.f[{}]", index);
+            return fmt::format("{}.f[{}]", uniform_block, index);
         default:
             UNREACHABLE();
             return "";
@@ -350,7 +356,7 @@ private:
         case RegisterType::Output:
             return outputreg_getter(index);
         case RegisterType::Temporary:
-            return fmt::format("reg_tmp{}", index);
+            return fmt::format("{}reg_tmp{}", prefix, index);
         default:
             UNREACHABLE();
             return "";
@@ -359,7 +365,8 @@ private:
 
     /// Generates code representing a bool uniform
     std::string GetUniformBool(u32 index, bool invert_test = false) const {
-        return fmt::format("(uniforms.b & {}u) {} 0u", 1 << index, invert_test ? "==" : "!=");
+        return fmt::format("({}.b & {}u) {} 0u", uniform_block, 1 << index,
+                           invert_test ? "==" : "!=");
     }
 
     /**
@@ -368,12 +375,12 @@ private:
      */
     void CallSubroutine(const Subroutine& subroutine) {
         if (subroutine.exit_method == ExitMethod::AlwaysEnd) {
-            shader.AddLine("{}();", subroutine.GetName());
+            shader.AddLine("{}();", SubName(subroutine));
             shader.AddLine("return true;");
         } else if (subroutine.exit_method == ExitMethod::Conditional) {
-            shader.AddLine("if ({}()) {{ return true; }}", subroutine.GetName());
+            shader.AddLine("if ({}()) {{ return true; }}", SubName(subroutine));
         } else {
-            shader.AddLine("{}();", subroutine.GetName());
+            shader.AddLine("{}();", SubName(subroutine));
         }
     }
 
@@ -460,7 +467,7 @@ private:
 
             case OpCode::Id::MUL: {
                 if (sanitize_mul) {
-                    SetDest(swizzle, dest_reg, fmt::format("sanitize_mul({}, {})", src1, src2), 4,
+                    SetDest(swizzle, dest_reg, fmt::format("{}sanitize_mul({}, {})", prefix, src1, src2), 4,
                             4);
                 } else {
                     SetDest(swizzle, dest_reg, fmt::format("{} * {}", src1, src2), 4, 4);
@@ -501,7 +508,7 @@ private:
                 std::string dot;
                 if (opcode == OpCode::Id::DP3) {
                     if (sanitize_mul) {
-                        dot = fmt::format("dot(vec3(sanitize_mul({}, {})), vec3(1.0))", src1, src2);
+                        dot = fmt::format("dot(vec3({}sanitize_mul({}, {})), vec3(1.0))", prefix, src1, src2);
                     } else {
                         dot = fmt::format("dot(vec3({}), vec3({}))", src1, src2);
                     }
@@ -512,7 +519,7 @@ private:
                                 ? fmt::format("vec4({}.xyz, 1.0)", src1)
                                 : std::move(src1);
 
-                        dot = fmt::format("dot(sanitize_mul({}, {}), vec4(1.0))", src1_, src2);
+                        dot = fmt::format("dot({}sanitize_mul({}, {}), vec4(1.0))", prefix, src1_, src2);
                     } else {
                         dot = fmt::format("dot({}, {})", src1, src2);
                     }
@@ -543,7 +550,8 @@ private:
             }
 
             case OpCode::Id::MOVA: {
-                SetDest(swizzle, "address_registers", fmt::format("ivec2({})", src1), 2, 2);
+                SetDest(swizzle, prefix + "address_registers", fmt::format("ivec2({})", src1), 2,
+                        2);
                 break;
             }
 
@@ -584,12 +592,12 @@ private:
                 } else if (cmp_ops.find(op_y) == cmp_ops.end()) {
                     LOG_ERROR(HW_GPU, "Unknown compare mode {:x}", op_y);
                 } else if (op_x != op_y) {
-                    shader.AddLine("conditional_code.x = {}.x {} {}.x;", src1,
+                    shader.AddLine("{}conditional_code.x = {}.x {} {}.x;", prefix, src1,
                                    cmp_ops.find(op_x)->second.first, src2);
-                    shader.AddLine("conditional_code.y = {}.y {} {}.y;", src1,
+                    shader.AddLine("{}conditional_code.y = {}.y {} {}.y;", prefix, src1,
                                    cmp_ops.find(op_y)->second.first, src2);
                 } else {
-                    shader.AddLine("conditional_code = {}(vec2({}), vec2({}));",
+                    shader.AddLine("{}conditional_code = {}(vec2({}), vec2({}));", prefix,
                                    cmp_ops.find(op_x)->second.second, src1, src2);
                 }
                 break;
@@ -640,12 +648,12 @@ private:
                     (instr.mad.dest.Value() < 0x10)
                         ? outputreg_getter(static_cast<u32>(instr.mad.dest.Value().GetIndex()))
                     : (instr.mad.dest.Value() < 0x20)
-                        ? "reg_tmp" + std::to_string(instr.mad.dest.Value().GetIndex())
+                        ? prefix + "reg_tmp" + std::to_string(instr.mad.dest.Value().GetIndex())
                         : "";
 
                 if (sanitize_mul) {
                     SetDest(swizzle, dest_reg,
-                            fmt::format("sanitize_mul({}, {}) + {}", src1, src2, src3), 4, 4);
+                            fmt::format("{}sanitize_mul({}, {}) + {}", prefix, src1, src2, src3), 4, 4);
                 } else {
                     SetDest(swizzle, dest_reg, fmt::format("{} * {} + {}", src1, src2, src3), 4, 4);
                 }
@@ -765,14 +773,15 @@ private:
 
             case OpCode::Id::LOOP: {
                 const std::string int_uniform =
-                    fmt::format("uniforms.i[{}]", instr.flow_control.int_uniform_id.Value());
+                    fmt::format("{}.i[{}]", uniform_block,
+                                instr.flow_control.int_uniform_id.Value());
 
-                shader.AddLine("address_registers.z = int({}.y);", int_uniform);
+                shader.AddLine("{}address_registers.z = int({}.y);", prefix, int_uniform);
 
                 const std::string loop_var = fmt::format("loop{}", offset);
                 shader.AddLine(
-                    "for (uint {} = 0u; {} <= {}.x; address_registers.z += int({}.z), ++{}) {{",
-                    loop_var, loop_var, int_uniform, int_uniform, loop_var);
+                    "for (uint {} = 0u; {} <= {}.x; {}address_registers.z += int({}.z), ++{}) {{",
+                    loop_var, loop_var, int_uniform, prefix, int_uniform, loop_var);
                 ++shader.scope;
 
                 auto& loop_sub = GetSubroutine(offset + 1, instr.flow_control.dest_offset + 1);
@@ -790,8 +799,22 @@ private:
             }
 
             case OpCode::Id::EMIT:
+                if (!geometry) {
+                    LOG_ERROR(HW_GPU, "Geometry shader operation detected in vertex shader");
+                    break;
+                }
+                shader.AddLine("{}emit();", prefix);
+                break;
+
             case OpCode::Id::SETEMIT:
-                LOG_ERROR(HW_GPU, "Geometry shader operation detected in vertex shader");
+                if (!geometry) {
+                    LOG_ERROR(HW_GPU, "Geometry shader operation detected in vertex shader");
+                    break;
+                }
+                shader.AddLine("{}setemit({}, {}, {});", prefix,
+                               static_cast<u32>(instr.setemit.vertex_id),
+                               instr.setemit.prim_emit ? "true" : "false",
+                               instr.setemit.winding ? "true" : "false");
                 break;
 
             default: {
@@ -825,7 +848,7 @@ private:
 
     void Generate() {
         if (sanitize_mul) {
-            shader.AddLine("vec4 sanitize_mul(vec4 lhs, vec4 rhs) {{");
+            shader.AddLine("vec4 {}sanitize_mul(vec4 lhs, vec4 rhs) {{", prefix);
             ++shader.scope;
             shader.AddLine("vec4 product = lhs * rhs;");
             shader.AddLine("return mix(product, mix(mix(vec4(0.0), product, isnan(rhs)), product, "
@@ -834,30 +857,30 @@ private:
             shader.AddLine("}}\n");
         }
 
-        shader.AddLine("vec4 get_offset_register(int base_index, int offset) {{");
+        shader.AddLine("vec4 {}get_offset_register(int base_index, int offset) {{", prefix);
         ++shader.scope;
         shader.AddLine("int fixed_offset = offset >= -128 && offset <= 127 ? offset : 0;");
         shader.AddLine("uint index = uint((base_index + fixed_offset) & 0x7F);");
-        shader.AddLine("return index < 96u ? uniforms.f[index] : vec4(1.0);");
+        shader.AddLine("return index < 96u ? {}.f[index] : vec4(1.0);", uniform_block);
         --shader.scope;
         shader.AddLine("}}\n");
 
         // Add declarations for registers
-        shader.AddLine("bvec2 conditional_code = bvec2(false);");
-        shader.AddLine("ivec3 address_registers = ivec3(0);");
+        shader.AddLine("bvec2 {}conditional_code = bvec2(false);", prefix);
+        shader.AddLine("ivec3 {}address_registers = ivec3(0);", prefix);
         for (int i = 0; i < 16; ++i) {
-            shader.AddLine("vec4 reg_tmp{} = vec4(0.0, 0.0, 0.0, 1.0);", i);
+            shader.AddLine("vec4 {}reg_tmp{} = vec4(0.0, 0.0, 0.0, 1.0);", prefix, i);
         }
         shader.AddNewLine();
 
         // Add declarations for all subroutines
         for (const auto& subroutine : subroutines) {
-            shader.AddLine("bool {}();", subroutine.GetName());
+            shader.AddLine("bool {}();", SubName(subroutine));
         }
         shader.AddNewLine();
 
         // Add the main entry point
-        shader.AddLine("bool exec_shader() {{");
+        shader.AddLine("bool {}exec_shader() {{", prefix);
         ++shader.scope;
         CallSubroutine(GetSubroutine(main_offset, PROGRAM_END));
         --shader.scope;
@@ -867,7 +890,7 @@ private:
         for (const auto& subroutine : subroutines) {
             std::set<u32> labels = subroutine.labels;
 
-            shader.AddLine("bool {}() {{", subroutine.GetName());
+            shader.AddLine("bool {}() {{", SubName(subroutine));
             ++shader.scope;
 
             if (labels.empty()) {
@@ -924,23 +947,35 @@ private:
     const RegGetter& inputreg_getter;
     const RegGetter& outputreg_getter;
     const bool sanitize_mul;
+    const std::string prefix;
+    const std::string uniform_block;
+    const bool geometry;
 
     ShaderWriter shader;
 };
 
 std::string DecompileProgram(const ProgramCode& program_code, const SwizzleData& swizzle_data,
                              u32 main_offset, const RegGetter& inputreg_getter,
-                             const RegGetter& outputreg_getter, bool sanitize_mul) {
+                             const RegGetter& outputreg_getter, const DecompileOptions& options) {
 
     try {
         auto subroutines = ControlFlowAnalyzer(program_code, main_offset).MoveSubroutines();
         GLSLGenerator generator(subroutines, program_code, swizzle_data, main_offset,
-                                inputreg_getter, outputreg_getter, sanitize_mul);
+                                inputreg_getter, outputreg_getter, options);
         return generator.MoveShaderCode();
     } catch (const DecompileFail& exception) {
         LOG_INFO(HW_GPU, "Shader decompilation failed: {}", exception.what());
         return "";
     }
+}
+
+std::string DecompileProgram(const ProgramCode& program_code, const SwizzleData& swizzle_data,
+                             u32 main_offset, const RegGetter& inputreg_getter,
+                             const RegGetter& outputreg_getter, bool sanitize_mul) {
+    DecompileOptions options{};
+    options.sanitize_mul = sanitize_mul;
+    return DecompileProgram(program_code, swizzle_data, main_offset, inputreg_getter,
+                            outputreg_getter, options);
 }
 
 } // namespace Pica::Shader::Generator::GLSL

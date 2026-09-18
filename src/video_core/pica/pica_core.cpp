@@ -1259,9 +1259,15 @@ void PicaCore::DrawArrays(bool is_indexed) {
     }
 
     const bool accelerate_draw = [this] {
-        // Geometry shaders cannot be accelerated due to register preservation.
         if (regs.internal.pipeline.use_gs == PipelineRegs::UseGS::Yes) {
-            return false;
+            // A point-mode geometry program with shader topology can run inside the host vertex
+            // shader. The backend checks the program and falls back to software when it depends
+            // on registers kept between invocations. Other geometry modes stay in software.
+            return Settings::values.use_hw_shader && primitive_assembler.IsEmpty() &&
+                   geometry_pipeline.IsEmpty() &&
+                   regs.internal.pipeline.gs_config.mode == PipelineRegs::GSMode::Point &&
+                   regs.internal.pipeline.triangle_topology ==
+                       PipelineRegs::TriangleTopology::Shader;
         }
 
         // TODO (wwylele): for Strip/Fan topology, if the primitive assember is not restarted

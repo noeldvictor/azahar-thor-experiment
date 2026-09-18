@@ -142,6 +142,73 @@ struct PicaVSConfigState {
 };
 
 /**
+ * Identifies a point-mode PICA geometry program that runs inside the host vertex shader. The host
+ * draws max_vertices vertices per PICA input vertex. Each host vertex runs the vertex program and
+ * then the geometry program, and keeps the one emitted corner that its index selects.
+ */
+struct PicaGSExpandState {
+    u64 gs_program_hash;
+    u64 gs_swizzle_hash;
+    u32 gs_main_offset;
+    /// Vertex outputs fed to one geometry invocation. Only one input vertex per invocation.
+    u32 gs_num_inputs;
+    /// Number of set bits in the geometry output mask.
+    u32 gs_num_outputs;
+    /// Host vertices per PICA input vertex: three per reachable EMIT.
+    u32 max_vertices;
+    /// gs_input_map[packed vertex output k] -> geometry input register
+    std::array<u8, 16> gs_input_map;
+    /// gs_output_map[geometry output register] -> packed attribute index, or 16 when unused
+    std::array<u8, 16> gs_output_map;
+
+    static consteval u64 StructHash() {
+        constexpr u64 STRUCT_VERSION = 0;
+
+        using T = PicaGSExpandState;
+        return Common::HashCombine(STRUCT_VERSION,
+
+                                   // layout
+                                   LAYOUT_HASH,
+
+                                   // fields
+                                   FIELD_HASH(gs_program_hash), FIELD_HASH(gs_swizzle_hash),
+                                   FIELD_HASH(gs_main_offset), FIELD_HASH(gs_num_inputs),
+                                   FIELD_HASH(gs_num_outputs), FIELD_HASH(max_vertices),
+                                   FIELD_HASH(gs_input_map), FIELD_HASH(gs_output_map));
+    }
+};
+
+struct PicaGSExpandVSConfigState {
+    PicaVSConfigState vs;
+    PicaGSExpandState gs;
+
+    static consteval u64 StructHash() {
+        constexpr u64 STRUCT_VERSION = 0;
+
+        using T = PicaGSExpandVSConfigState;
+        return Common::HashCombine(STRUCT_VERSION,
+
+                                   // layout
+                                   LAYOUT_HASH,
+
+                                   // fields
+                                   FIELD_HASH(vs), FIELD_HASH(gs),
+
+                                   // nested layout
+                                   PicaVSConfigState::StructHash(),
+                                   PicaGSExpandState::StructHash());
+    }
+};
+
+/**
+ * Identifies a host vertex shader that fuses a PICA vertex program with a point-mode PICA
+ * geometry program.
+ */
+struct PicaGSExpandVSConfig : Common::HashableStruct<PicaGSExpandVSConfigState> {
+    PicaGSExpandVSConfig() = default;
+};
+
+/**
  * This struct contains information to identify a GL vertex shader generated from PICA vertex
  * shader.
  */
@@ -182,6 +249,13 @@ namespace std {
 template <>
 struct hash<Pica::Shader::Generator::PicaVSConfig> {
     std::size_t operator()(const Pica::Shader::Generator::PicaVSConfig& k) const noexcept {
+        return k.Hash();
+    }
+};
+
+template <>
+struct hash<Pica::Shader::Generator::PicaGSExpandVSConfig> {
+    std::size_t operator()(const Pica::Shader::Generator::PicaGSExpandVSConfig& k) const noexcept {
         return k.Hash();
     }
 };

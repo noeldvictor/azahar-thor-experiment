@@ -26,6 +26,18 @@ layout (binding = 0, std140) uniform vs_pica_data {
 } uniforms;
 )";
 
+constexpr std::string_view GSPicaUniformBlockDef = R"(
+#ifdef VULKAN
+layout (set = 0, binding = 6, std140) uniform gs_pica_data {
+#else
+layout (binding = 6, std140) uniform gs_pica_data {
+#endif
+    uint b;
+    uvec4 i[4];
+    vec4 f[96];
+} gs_uniforms;
+)";
+
 constexpr std::string_view VSUniformBlockDef = R"(
 #ifdef VULKAN
 layout (set = 0, binding = 1, std140) uniform vs_data {
@@ -295,6 +307,251 @@ std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& c
 
     out += program_source;
 
+    return out;
+}
+
+std::string GenerateGeometryExpandedVertexShader(const ShaderSetup& vs_setup,
+                                                 const ShaderSetup& gs_setup,
+                                                 const PicaGSExpandVSConfig& config,
+                                                 const ExtraVSConfig& extra) {
+    const PicaVSConfigState& vs = config.state.vs;
+    const PicaGSExpandState& gs = config.state.gs;
+    const bool separable_shader = extra.separable_shader;
+
+    if (extra.use_geometry_shader) {
+        // The host geometry stage is not combined with an expanded PICA geometry program.
+        return "";
+    }
+
+    std::string out;
+    if (separable_shader) {
+        out += "#extension GL_ARB_separate_shader_objects : enable\n";
+    }
+
+    out += VSPicaUniformBlockDef;
+    out += VSUniformBlockDef;
+    out += GSPicaUniformBlockDef;
+
+    // Vertex program: inputs from the vertex layout, outputs to vs_o<k>.
+    std::array<bool, 16> used_regs{};
+    const auto get_input_reg = [&used_regs](u32 reg) {
+        ASSERT(reg < 16);
+        used_regs[reg] = true;
+        return fmt::format("vs_in_reg{}", reg);
+    };
+    const auto get_vs_output_reg = [&vs](u32 reg) -> std::string {
+        ASSERT(reg < 16);
+        if (vs.output_map[reg] < vs.num_outputs) {
+            return fmt::format("vs_o{}", vs.output_map[reg]);
+        }
+        return "";
+    };
+    DecompileOptions vs_options{};
+    vs_options.sanitize_mul = extra.sanitize_mul;
+    const std::string vs_source =
+        DecompileProgram(vs_setup.GetProgramCode(), vs_setup.GetSwizzleData(), vs.main_offset,
+                         get_input_reg, get_vs_output_reg, vs_options);
+    if (vs_source.empty()) {
+        return "";
+    }
+
+    // Geometry program: inputs from gs_in_reg<r>, outputs to gs_o<r>.
+    std::array<bool, 16> used_gs_inputs{};
+    const auto get_gs_input_reg = [&used_gs_inputs](u32 reg) {
+        ASSERT(reg < 16);
+        used_gs_inputs[reg] = true;
+        return fmt::format("gs_in_reg{}", reg);
+    };
+    const auto get_gs_output_reg = [&gs](u32 reg) -> std::string {
+        ASSERT(reg < 16);
+        if (gs.gs_output_map[reg] < gs.gs_num_outputs) {
+            return fmt::format("gs_o{}", reg);
+        }
+        return "";
+    };
+    DecompileOptions gs_options{};
+    gs_options.sanitize_mul = extra.sanitize_mul;
+    gs_options.prefix = "gs_";
+    gs_options.uniform_block = "gs_uniforms";
+    gs_options.geometry = true;
+    const std::string gs_source =
+        DecompileProgram(gs_setup.GetProgramCode(), gs_setup.GetSwizzleData(), gs.gs_main_offset,
+                         get_gs_input_reg, get_gs_output_reg, gs_options);
+    if (gs_source.empty()) {
+        return "";
+    }
+
+    // Input attributes.
+    for (std::size_t i = 0; i < used_regs.size(); ++i) {
+        if (used_regs[i]) {
+            const auto flags = extra.load_flags[i];
+            const std::string_view prefix = MakeLoadPrefix(flags);
+            out +=
+                fmt::format("layout(location = {0}) in {1}vec4 vs_in_typed_reg{0};\n", i, prefix);
+            out += fmt::format("vec4 vs_in_reg{0};\n", i);
+        }
+    }
+    out += '\n';
+
+    // Packed vertex outputs, geometry inputs, and geometry output registers.
+    for (u32 k = 0; k < vs.num_outputs; ++k) {
+        out += fmt::format("vec4 vs_o{};\n", k);
+    }
+    for (u32 r = 0; r < 16; ++r) {
+        if (used_gs_inputs[r]) {
+            out += fmt::format("vec4 gs_in_reg{};\n", r);
+        }
+    }
+    std::array<u32, 16> packed_gs_output_regs{};
+    for (u32 r = 0; r < 16; ++r) {
+        if (gs.gs_output_map[r] < gs.gs_num_outputs) {
+            out += fmt::format("vec4 gs_o{};\n", r);
+            packed_gs_output_regs[gs.gs_output_map[r]] = r;
+        }
+    }
+    out += '\n';
+
+    // The fragment interface is driven by the geometry output map.
+    out += GetVertexInterfaceDeclaration(true, extra.use_clip_planes, separable_shader);
+    for (u32 m = 0; m < gs.gs_num_outputs; ++m) {
+        out += fmt::format("vec4 vs_out_attr{};\n", m);
+    }
+
+    const auto semantic_maps = vs.gs_state.GetSemanticMaps();
+    const auto semantic = [&state = vs, &semantic_maps](
+                              VSOutputAttributes::Semantic slot_semantic) -> std::string {
+        const u32 slot = static_cast<u32>(slot_semantic);
+        const u32 attrib = semantic_maps[slot].attribute_index;
+        const u32 comp = semantic_maps[slot].component_index;
+        if (attrib < state.gs_state.gs_output_attributes_count) {
+            return fmt::format("vs_out_attr{}.{}", attrib, "xyzw"[comp]);
+        }
+        return "1.0";
+    };
+
+    out += "vec4 GetVertexQuaternion() {\n";
+    out += "    return vec4(" + semantic(VSOutputAttributes::QUATERNION_X) + ", " +
+           semantic(VSOutputAttributes::QUATERNION_Y) + ", " +
+           semantic(VSOutputAttributes::QUATERNION_Z) + ", " +
+           semantic(VSOutputAttributes::QUATERNION_W) + ");\n";
+    out += "}\n\n";
+
+    out += "void EmitVtx() {\n";
+    out += "    vec4 vtx_pos = vec4(" + semantic(VSOutputAttributes::POSITION_X) + ", " +
+           semantic(VSOutputAttributes::POSITION_Y) + ", " +
+           semantic(VSOutputAttributes::POSITION_Z) + ", " +
+           semantic(VSOutputAttributes::POSITION_W) + ");\n";
+    out += "    vtx_pos = SanitizeVertex(vtx_pos);\n";
+    out += "    if (flip_viewport) {\n";
+    out += "        vtx_pos.y = -vtx_pos.y;\n";
+    out += "    }\n";
+    out += "    gl_Position = vec4(vtx_pos.x, vtx_pos.y, -vtx_pos.z, vtx_pos.w);\n";
+    if (extra.use_clip_planes) {
+        out += "    gl_ClipDistance[0] = -vtx_pos.z;\n"; // fixed PICA clipping plane z <= 0
+        out += "    if (enable_clip1) {\n";
+        out += "        gl_ClipDistance[1] = dot(clip_coef, vtx_pos);\n";
+        out += "    } else {\n";
+        out += "        gl_ClipDistance[1] = 0.0;\n";
+        out += "    }\n\n";
+    }
+    out += "    normquat = GetVertexQuaternion();\n";
+    out += "    vec4 vtx_color = vec4(" + semantic(VSOutputAttributes::COLOR_R) + ", " +
+           semantic(VSOutputAttributes::COLOR_G) + ", " +
+           semantic(VSOutputAttributes::COLOR_B) + ", " +
+           semantic(VSOutputAttributes::COLOR_A) + ");\n";
+    out += "    primary_color = min(abs(vtx_color), vec4(1.0));\n\n";
+    out += "    texcoord0 = vec2(" + semantic(VSOutputAttributes::TEXCOORD0_U) + ", " +
+           semantic(VSOutputAttributes::TEXCOORD0_V) + ");\n";
+    out += "    texcoord1 = vec2(" + semantic(VSOutputAttributes::TEXCOORD1_U) + ", " +
+           semantic(VSOutputAttributes::TEXCOORD1_V) + ");\n\n";
+    out += "    texcoord0_w = " + semantic(VSOutputAttributes::TEXCOORD0_W) + ";\n";
+    out += "    view = vec3(" + semantic(VSOutputAttributes::VIEW_X) + ", " +
+           semantic(VSOutputAttributes::VIEW_Y) + ", " + semantic(VSOutputAttributes::VIEW_Z) +
+           ");\n\n";
+    out += "    texcoord2 = vec2(" + semantic(VSOutputAttributes::TEXCOORD2_U) + ", " +
+           semantic(VSOutputAttributes::TEXCOORD2_V) + ");\n\n";
+    out += "}\n\n";
+
+    // Emit machinery. The PICA geometry unit keeps three vertex slots. A primitive emit sends
+    // slots 0, 1, 2 to the assembler; the winding flag swaps the first two.
+    out += fmt::format("vec4 gs_slot[3][{}];\n", gs.gs_num_outputs);
+    out += "int gs_emit_vid = 0;\n";
+    out += "bool gs_emit_prim = false;\n";
+    out += "bool gs_emit_wind = false;\n";
+    out += "int gs_prim_index = 0;\n";
+    out += "int gs_target_prim = 0;\n";
+    out += "int gs_target_corner = 0;\n";
+    out += "bool gs_captured = false;\n\n";
+    out += "void gs_setemit(int vid, bool prim, bool wind) {\n";
+    out += "    gs_emit_vid = vid;\n";
+    out += "    gs_emit_prim = prim;\n";
+    out += "    gs_emit_wind = wind;\n";
+    out += "}\n\n";
+    out += "void gs_emit() {\n";
+    for (u32 m = 0; m < gs.gs_num_outputs; ++m) {
+        out += fmt::format("    gs_slot[gs_emit_vid][{}] = gs_o{};\n", m,
+                           packed_gs_output_regs[m]);
+    }
+    out += "    if (gs_emit_prim) {\n";
+    out += "        if (gs_prim_index == gs_target_prim) {\n";
+    out += "            int s = gs_target_corner == 2 ? 2 : (gs_emit_wind ? 1 - gs_target_corner "
+           ": gs_target_corner);\n";
+    for (u32 m = 0; m < gs.gs_num_outputs; ++m) {
+        out += fmt::format("            vs_out_attr{0} = gs_slot[s][{0}];\n", m);
+    }
+    out += "            gs_captured = true;\n";
+    out += "        }\n";
+    out += "        gs_prim_index++;\n";
+    out += "    }\n";
+    out += "}\n\n";
+
+    out += "bool exec_shader();\n";
+    out += "bool gs_exec_shader();\n\n";
+
+    out += "void main() {\n";
+    for (std::size_t i = 0; i < used_regs.size(); ++i) {
+        if (used_regs[i]) {
+            out += fmt::format("    vs_in_reg{0} = vec4(vs_in_typed_reg{0});\n", i);
+            if (True(extra.load_flags[i] & AttribLoadFlags::ZeroW)) {
+                out += fmt::format("    vs_in_reg{0}.w = 0;\n", i);
+            }
+        }
+    }
+    for (u32 k = 0; k < vs.num_outputs; ++k) {
+        out += fmt::format("    vs_o{} = vec4(0.0, 0.0, 0.0, 1.0);\n", k);
+    }
+    out += "    exec_shader();\n\n";
+
+    out += "    gs_target_prim = gl_VertexIndex / 3;\n";
+    out += "    gs_target_corner = gl_VertexIndex - gs_target_prim * 3;\n";
+    for (u32 r = 0; r < 16; ++r) {
+        if (used_gs_inputs[r]) {
+            out += fmt::format("    gs_in_reg{} = vec4(0.0, 0.0, 0.0, 1.0);\n", r);
+        }
+    }
+    for (u32 k = 0; k < gs.gs_num_inputs && k < vs.num_outputs; ++k) {
+        const u32 reg = gs.gs_input_map[k];
+        if (reg < 16 && used_gs_inputs[reg]) {
+            out += fmt::format("    gs_in_reg{} = vs_o{};\n", reg, k);
+        }
+    }
+    for (u32 r = 0; r < 16; ++r) {
+        if (gs.gs_output_map[r] < gs.gs_num_outputs) {
+            out += fmt::format("    gs_o{} = vec4(0.0, 0.0, 0.0, 1.0);\n", r);
+        }
+    }
+    for (u32 m = 0; m < gs.gs_num_outputs; ++m) {
+        out += fmt::format("    vs_out_attr{} = vec4(0.0, 0.0, 0.0, 1.0);\n", m);
+    }
+    out += "    gs_exec_shader();\n";
+    out += "    EmitVtx();\n";
+    out += "    if (!gs_captured) {\n";
+    out += "        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);\n";
+    out += "    }\n";
+    out += "}\n\n";
+
+    out += vs_source;
+    out += gs_source;
     return out;
 }
 

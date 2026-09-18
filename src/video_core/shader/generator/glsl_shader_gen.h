@@ -27,6 +27,7 @@ struct ShaderSetup;
 
 namespace Pica::Shader::Generator {
 struct PicaVSConfig;
+struct PicaGSExpandVSConfig;
 struct ExtraVSConfig;
 struct PicaFixedGSConfig;
 struct ExtraFixedGSConfig;
@@ -47,6 +48,18 @@ std::string GenerateTrivialVertexShader(bool use_clip_planes, bool separable_sha
  */
 std::string GenerateVertexShader(const Pica::ShaderSetup& setup, const PicaVSConfig& config,
                                  const ExtraVSConfig& extra);
+
+/**
+ * Generates a GLSL vertex shader that runs the given VS program and then the given point-mode
+ * geometry program for one PICA input vertex per instance. Host vertex index v keeps corner
+ * v % 3 of the (v / 3)-th triangle the geometry program emits. Unused host vertices are placed
+ * outside the clip volume.
+ * @returns String of the shader source code; empty on failure
+ */
+std::string GenerateGeometryExpandedVertexShader(const Pica::ShaderSetup& vs_setup,
+                                                 const Pica::ShaderSetup& gs_setup,
+                                                 const PicaGSExpandVSConfig& config,
+                                                 const ExtraVSConfig& extra);
 
 /**
  * Generates the GLSL fixed geometry shader program source code for non-GS PICA pipeline

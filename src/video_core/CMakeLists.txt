@@ -73,6 +73,8 @@ add_library(video_core STATIC EXCLUDE_FROM_ALL
     shader/debug_data.h
     shader/generator/glsl_fs_shader_gen.cpp
     shader/generator/glsl_fs_shader_gen.h
+    shader/geometry_expand.cpp
+    shader/geometry_expand.h
     shader/generator/glsl_shader_decompiler.cpp
     shader/generator/glsl_shader_decompiler.h
     shader/generator/glsl_shader_gen.cpp

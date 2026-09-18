@@ -56,7 +56,17 @@ of a raw `adb` command when a tool exists.
   missed.
 - `screenshot`, `fps`, `gpu`, `threads`, and `emulation_thread_time` measure a running scene.
   `frame_profile` reads the whole-frame counters of a profiling build.
+- `gpu_faults` counts the kernel's `CP: AHB bus error` lines and maps each burst to wall-clock
+  time. Call it before and after every Vulkan measurement. A run with a new burst is void.
+- `app_maintenance` runs one operation inside the app on its private driver directories: list,
+  verify, clear_redirect, reinstall_driver, or system_driver. The app reads the request from
+  `thor_maintenance.txt` in the user directory at startup and writes `log/thor_maintenance.json`.
+- `ui_dump` and `ui_tap` read the visible UI of a panel and press a node by its text.
 - `install`, `pull`, `push`, `shell`, and `logcat` cover the rest.
+
+When a test needs a device capability that no tool provides, add a tool to the server and record
+it here. Do not add an exported Android component for that; the request file above is the
+channel into the app.
 
 The tools depend on these facts: package `org.azahar_emu.azahar.debug`, user directory
 `/storage/emulated/0/Azaharuser`, ROM tree `2664-21DE:Roms/n3ds`, USB serial `c3ca0370`. Change

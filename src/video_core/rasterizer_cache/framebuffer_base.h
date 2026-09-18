@@ -95,7 +95,7 @@ public:
     explicit FramebufferHelper(RasterizerCache<T>* res_cache_, typename T::Framebuffer* fb_,
                                bool flip_rect, const Pica::RasterizerRegs& regs,
                                Common::Rectangle<u32> surfaces_rect)
-        : res_cache{res_cache_}, fb{fb_} {
+        : res_cache{res_cache_}, fb{fb_}, framebuffer_rect{surfaces_rect} {
         const u32 res_scale = fb->Scale();
         const u32 height = surfaces_rect.GetHeight() / res_scale;
 
@@ -167,6 +167,11 @@ public:
         return draw_rect;
     }
 
+    /// The scaled rectangle of the whole framebuffer surface
+    Common::Rectangle<u32> FramebufferRect() const noexcept {
+        return framebuffer_rect;
+    }
+
     Common::Rectangle<s32> Scissor() const noexcept {
         return scissor_rect;
     }
@@ -180,6 +185,7 @@ private:
     typename T::Framebuffer* fb;
     Common::Rectangle<s32> scissor_rect;
     Common::Rectangle<u32> draw_rect;
+    Common::Rectangle<u32> framebuffer_rect;
     ViewportInfo viewport;
 };
 

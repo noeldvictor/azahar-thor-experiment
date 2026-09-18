@@ -1588,3 +1588,45 @@
   CPU vertex and geometry work to the GPU and remove the 520 immediate draws per frame. It would
   not remove the render pass switches and barriers that saturate the GPU on the menu screens.
   Rank the barrier cost first if the goal is 60 FPS at 3x on this title.
+- Point-mode geometry programs run inside the host vertex shader (2026-09-18).
+  `RasterizerVulkan::AccelerateGeometryDrawBatch` accepts a geometry draw only when the mode is
+  Point, the topology is Shader, one vertex feeds one invocation, and
+  `Pica::Shader::AnalyzeGeometryProgram` proves that no reachable instruction reads a temporary,
+  output, condition, or address register that the same invocation did not write. That check is
+  a must-write dataflow over the program's control flow graph. It is the correctness argument:
+  the PICA geometry unit keeps its registers between invocations and the host shader cannot.
+  E.X. Troopers program 0x2E passes and program 0x58 fails at instruction 133 (a header vertex
+  stores matrix rows in registers 10 to 15 for later vertices); keep 0x58 in software. The fused
+  shader draws three host vertices per reachable EMIT, one instance per PICA vertex, gathers
+  indexed vertices on the CPU, repeats the fixed attribute block once per instance instead of a
+  zero stride, and keeps the three emit slots in named variables instead of a dynamically
+  indexed array. Its uniforms use buffer binding 6 (dynamic offset index 3). Its pipelines are
+  not written to the pipeline disk cache (`PipelineCache::IsVertexShaderTransient`). Measured on
+  the save-slot screen at 2x: accelerated draws 33% to 95%, 93,773 of 103,821 geometry draws
+  expanded, output identical by inspection. The GPU stayed at 99.9% busy and the frame rate did
+  not move: the pass restarts, not the draw path, hold that screen.
+- Render pass restart reasons (2026-09-18), from the profiler counters
+  `renderpass_restart color_switch/depth_toggle/same_images/area_shrink/area_grow/area_other`:
+  on the E.X. Troopers save-slot screen 221 to 252 begins per swap split into 121 to 140 color
+  target switches, 28 depth attachment toggles, 39 to 45 render area changes, and about 34
+  passes that follow a blit, copy, or submit. Two candidates exist in `vk_rasterizer.cpp` behind
+  `kRetainDepthAttachment` (keep the open pass's depth attachment for a draw that neither tests
+  nor writes depth) and `kFullRenderArea` (begin a pass with the framebuffer rectangle when it
+  is at most twice the draw rectangle). Both are off and unmeasured: the device fault below
+  stopped every Vulkan launch before their A/B. Do not enable one without the matrix.
+- Thor GPU fault (open, 2026-09-18): the kernel logs `kgsl-3d0: CP: AHB bus error` bursts and
+  the app then spins on `dequeueBuffer timed out` (the buffer queue returns INVALID_OPERATION
+  while the driver holds every swapchain image). From 12:44 every Vulkan launch of every title
+  faulted one to three seconds in, on the unmodified production build too, after a warm reboot
+  too. Ruled out with evidence in the notes: the fork's code, the emulator's transferable and
+  pipeline caches, the app's private driver files (the extracted Turnip R8 hashes equal its zip;
+  the redirect directory is empty), config.ini, the per-title ini, the user directory, the ROM
+  (hashes identical twice), thermal state, GPU power levels, display modes, Android GPU debug
+  layers, and a running tracer. OpenGL launches of the same title log no fault. Use the
+  `gpu_faults` tool before and after any Vulkan measurement; a run with a new burst is void.
+- Device capabilities live in the MCP server (2026-09-18). When a test needs something the
+  server cannot do, add a tool there; do not add an exported Android component. Maintenance
+  inside the app's private storage goes through `app_maintenance`: the app reads
+  `thor_maintenance.txt` from the user directory at startup, runs one of list, verify,
+  clear_redirect, reinstall_driver, or system_driver on its own driver directories, and writes
+  `log/thor_maintenance.json`.

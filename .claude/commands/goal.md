@@ -42,9 +42,14 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
   no frame-rate patch. Its target is GPU efficiency: at 3x the same scene would exceed the GPU.
 - Bug: opening the game's pause menu during a video freezes emulation. The VulkanWorker thread then spins on `dequeueBuffer timed out`. Reproduced twice. Avoid START during videos until fixed. Record it in the ledger.
 - The hack list already forces `SKIP_TEXTURE_COPY_FALLBACK` for this title. The same key in the per-title ini is redundant.
-- Geometry shaders: point mode, shader topology, inputs from vertex outputs, three programs. All
-  are rejected in `PicaCore::ProcessDraw`. A hardware geometry stage is feasible for this mode but
-  is a multi-day feature; see AGENTS.md. It does not remove the render pass switches.
+- Geometry shaders: program 0x2E now runs inside the host vertex shader; 0x58 and 0x3C stay in
+  software because they keep state between invocations. Accelerated draws rose from 33% to 95%
+  on the save-slot screen with no frame rate change: the pass restarts hold the GPU there.
+- Pass restarts per swap: 121 to 140 color target switches, 28 depth toggles, 39 to 45 render
+  area changes. Two merging candidates are written and switched off; their A/B is pending.
+- Blocker (2026-09-18 afternoon): every Vulkan launch faults the GPU one to three seconds in,
+  on the control build too, after a warm reboot too. Use `gpu_faults` before and after every
+  Vulkan run. Next test: full power-off of the handheld. See AGENTS.md.
 
 ## Procedure
 

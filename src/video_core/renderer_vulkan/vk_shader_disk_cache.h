@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "video_core/shader/geometry_expand.h"
 #include <mutex>
 #include <optional>
 #include <unordered_set>
@@ -37,6 +38,11 @@ public:
         const Pica::RegsInternal& regs, const Pica::Shader::UserConfig& user);
     std::optional<std::pair<u64, Shader* const>> UseFixedGeometryShader(
         const Pica::RegsInternal& regs);
+    /// Compiles or finds a vertex shader that also runs a point-mode geometry program. These
+    /// shaders live in memory only; their pipelines are not written to the disk cache.
+    std::optional<std::pair<u64, Shader* const>> UseGeometryExpandedVertexShader(
+        const Pica::RegsInternal& regs, Pica::ShaderSetup& vs_setup, Pica::ShaderSetup& gs_setup,
+        const VertexLayout& layout, const Pica::Shader::GeometryExpandInfo& expand);
 
     GraphicsPipeline* GetPipeline(const PipelineInfo& info);
 
@@ -352,6 +358,7 @@ private:
     std::unordered_map<u64, Shader> fragment_shaders;
 
     std::unordered_map<size_t, Shader> fixed_geometry_shaders;
+    std::unordered_map<u64, Shader> expanded_vertex_shaders;
     std::unordered_set<u64> known_geometry_shaders;
 
     tsl::robin_map<u64, std::unique_ptr<GraphicsPipeline>, Common::IdentityHash<u64>>

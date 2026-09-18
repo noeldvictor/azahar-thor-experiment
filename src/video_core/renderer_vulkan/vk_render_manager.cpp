@@ -41,10 +41,44 @@ void RenderManager::BeginRendering(const Framebuffer* framebuffer,
         .clear = {},
         .do_clear = false,
     };
+    if (pass.render_pass && !(pass == new_pass)) {
+        ClassifyRestart(new_pass, framebuffer->Images());
+    }
     images = framebuffer->Images();
     aspects = framebuffer->Aspects();
     shadow_rendering = framebuffer->shadow_rendering;
     BeginRendering(new_pass);
+}
+
+void RenderManager::ClassifyRestart(const RenderPass& new_pass,
+                                    const std::array<vk::Image, 2>& new_images) const {
+    using VideoCore::FrameProfileEvent;
+    const auto contains = [](const vk::Rect2D& outer, const vk::Rect2D& inner) {
+        return inner.offset.x >= outer.offset.x && inner.offset.y >= outer.offset.y &&
+               inner.offset.x + static_cast<s32>(inner.extent.width) <=
+                   outer.offset.x + static_cast<s32>(outer.extent.width) &&
+               inner.offset.y + static_cast<s32>(inner.extent.height) <=
+                   outer.offset.y + static_cast<s32>(outer.extent.height);
+    };
+    if (pass.framebuffer != new_pass.framebuffer || pass.render_pass != new_pass.render_pass) {
+        if (images[0] != new_images[0]) {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartColorSwitch);
+        } else if ((images[1] == VK_NULL_HANDLE) != (new_images[1] == VK_NULL_HANDLE)) {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartDepthToggle);
+        } else {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartSameImages);
+        }
+    } else if (pass.render_area != new_pass.render_area) {
+        if (contains(pass.render_area, new_pass.render_area)) {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartAreaShrink);
+        } else if (contains(new_pass.render_area, pass.render_area)) {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartAreaGrow);
+        } else {
+            VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartAreaOther);
+        }
+    } else {
+        VideoCore::AddFrameProfileEvent(FrameProfileEvent::RenderPassRestartClear);
+    }
 }
 
 void RenderManager::BeginRendering(const RenderPass& new_pass) {

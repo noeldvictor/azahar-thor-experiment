@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <vector>
+#include <unordered_map>
+#include "video_core/shader/geometry_expand.h"
 #include "video_core/rasterizer_accelerated.h"
 #include "video_core/renderer_vulkan/vk_descriptor_update_queue.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
@@ -99,10 +102,18 @@ private:
     void SetupIndexArray();
 
     /// Setup vertex array for AccelerateDrawBatch
-    void SetupVertexArray();
+    /// Uploads the vertex loaders. With gather_indices, vertex i of the upload is the
+    /// gather_indices[i]-th PICA vertex; with instance_rate, every binding advances per instance
+    /// and the fixed binding gets a zero stride.
+    void SetupVertexArray(const u16* gather_indices, u32 gather_count, bool instance_rate);
+
+    /// Draws a point-mode geometry batch with the geometry program expanded in the vertex shader
+    bool AccelerateGeometryDrawBatch(bool is_indexed);
 
     /// Setup the fixed attribute emulation in vulkan
-    void SetupFixedAttribs();
+    /// Uploads the fixed and default attributes. With copies > 1 the block is repeated once
+    /// per instance so that an instanced draw reads the same values for every instance.
+    void SetupFixedAttribs(u32 copies = 1);
 
     /// Setup vertex shader for AccelerateDrawBatch
     bool SetupVertexShader();
@@ -140,6 +151,14 @@ private:
     u32 uniform_size_aligned_vs_pica;
     u32 uniform_size_aligned_vs;
     u32 uniform_size_aligned_fs;
+    u32 uniform_size_aligned_gs_pica;
+    bool gs_uniforms_valid{};
+    PAddr pass_color_addr{};
+    PAddr pass_depth_addr{};
+    bool geometry_expand_draw{};
+    u32 geometry_expand_vertices{};
+    std::vector<u16> geometry_gather_indices;
+    std::unordered_map<u64, Pica::Shader::GeometryExpandInfo> geometry_expand_cache;
     bool async_shaders{false};
 };
 

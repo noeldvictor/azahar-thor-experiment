@@ -56,7 +56,7 @@ AttribLoadFlags MakeAttribLoadFlag(Pica::PipelineRegs::VertexAttributeFormat for
     }
 }
 
-constexpr std::array<vk::DescriptorSetLayoutBinding, 6> BUFFER_BINDINGS = {{
+constexpr std::array<vk::DescriptorSetLayoutBinding, 7> BUFFER_BINDINGS = {{
     {0, vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex},
     {1, vk::DescriptorType::eUniformBufferDynamic, 1,
      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eGeometry},
@@ -64,6 +64,8 @@ constexpr std::array<vk::DescriptorSetLayoutBinding, 6> BUFFER_BINDINGS = {{
     {3, vk::DescriptorType::eUniformTexelBuffer, 1, vk::ShaderStageFlagBits::eFragment},
     {4, vk::DescriptorType::eUniformTexelBuffer, 1, vk::ShaderStageFlagBits::eFragment},
     {5, vk::DescriptorType::eUniformTexelBuffer, 1, vk::ShaderStageFlagBits::eFragment},
+    // PICA geometry program uniforms for the expanded vertex shader. Dynamic offset index 3.
+    {6, vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex},
 }};
 
 template <u32 NumTex0>
@@ -540,6 +542,7 @@ bool PipelineCache::UseProgrammableVertexShader(const Pica::RegsInternal& regs,
     if (res.has_value()) {
         current_shaders[ProgramType::VS] = (*res).second;
         shader_hashes[ProgramType::VS] = (*res).first;
+        vs_transient = false;
         return true;
     }
 
@@ -549,6 +552,24 @@ bool PipelineCache::UseProgrammableVertexShader(const Pica::RegsInternal& regs,
 void PipelineCache::UseTrivialVertexShader() {
     current_shaders[ProgramType::VS] = &trivial_vertex_shader;
     shader_hashes[ProgramType::VS] = 0;
+    vs_transient = false;
+}
+
+bool PipelineCache::UseGeometryExpandedVertexShader(
+    const Pica::RegsInternal& regs, Pica::ShaderSetup& vs_setup, Pica::ShaderSetup& gs_setup,
+    const VertexLayout& layout, const Pica::Shader::GeometryExpandInfo& expand) {
+
+    auto res =
+        curr_disk_cache->UseGeometryExpandedVertexShader(regs, vs_setup, gs_setup, layout, expand);
+
+    if (res.has_value()) {
+        current_shaders[ProgramType::VS] = (*res).second;
+        shader_hashes[ProgramType::VS] = (*res).first;
+        vs_transient = true;
+        return true;
+    }
+
+    return false;
 }
 
 bool PipelineCache::UseFixedGeometryShader(const Pica::RegsInternal& regs) {
