@@ -9316,3 +9316,15 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   merging does not move the 3D scene on this driver. The intro videos ran at 59.3 FPS with
   86.4% GPU, which is far too much for a 30 FPS video and points at the upload or copy path.
   Next: a profiling build at the engine scene on this driver to rank the counters there.
+- Profiling build on the system driver with the merging, 2x (2026-09-18, 19:23). Intro
+  videos: 30 FPS, 4% GPU, 4.5 pass begins per swap, one 256 KiB upload per swap. Heavy window
+  at 379 s (transition into the engine): 60 FPS, 99.9% GPU, 1646 draws per swap, 98.3 pass
+  begins per swap (64.5 color target switches, 5.2 area grow, 7.7 area other), 5.2 texture
+  blits per swap at 1.78 Mpix per swap, 2.7 texture copies per swap, 7.2 submits per swap,
+  1553 Mali-style flushes in the window. Space cutscene (final): 60 FPS, 52.7% GPU, 1084 draws
+  per swap, 60 pass begins per swap (39.3 color switches), 3.1 blits per swap at 1.08 Mpix.
+  The ice-field gameplay scene measured earlier with the same build: 51.9 FPS at 99.9%.
+- Flush heuristic trial: `Instance::ShouldFlush()` returned true for the Qualcomm driver, so
+  the render manager submitted and ended the pass every 20 draws. Limiting it to Mali gave
+  91.7% and 93.0% GPU at the menu against 91.1% for the shipped build, same frame rate. No
+  matched improvement; reverted. The 3D scene was not measured with it.

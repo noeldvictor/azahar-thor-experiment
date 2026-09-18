@@ -1670,3 +1670,13 @@
   retries the present window marks the swapchain for recreation instead of spinning forever.
   On a GPU that never completes its work the recreate path waits on the queue; measure it on
   the next fault before you rely on it.
+- Flush heuristic on the Qualcomm driver (2026-09-18 evening): removing the per-20-draw
+  flush for that driver changed nothing at the E.X. Troopers menu (91.7% and 93.0% against
+  91.1% GPU busy at 59.3 FPS). Rejected for now; measure it in the ice-field scene before you
+  try it again.
+- Next target for E.X. Troopers 3D scenes on the system driver (2026-09-18 evening): the
+  ice-field scene holds 51.9 FPS at 99.9% GPU at 2x with about 98 pass begins per swap, of
+  which 64 are color target switches, plus 5 texture blits per swap at 1.8 Mpix. Those come
+  from the game's render-to-texture and display-transfer pattern. The pass-level merges are
+  done; the next step needs that pattern understood from a per-draw log of targets and
+  samplers, not another pass-level heuristic.
