@@ -1643,3 +1643,11 @@
   Turnip package maintainer with the kernel line and the register. Until it clears, measure
   Vulkan work in scenes reached without a fresh launch or on the OpenGL backend, and keep
   `gpu_faults` around every run.
+- Driver split (2026-09-18 evening). The expanded geometry draw runs on Turnip and hangs the
+  Qualcomm proprietary driver on the Adreno 740 without a kernel fault; `AccelerateGeometryDrawBatch`
+  keeps those draws in software when `Instance::GetDriverID()` is the Qualcomm driver. The
+  system driver is the working path on the test unit while Turnip faults: the control build at
+  the E.X. Troopers save-slot screen gave 56.6 to 59.3 FPS mean with 16.86 ms P95 on it, against
+  40 FPS with 33.7 ms P95 on Turnip R8 this morning, both at 99.9% GPU busy at 2x. That is one
+  scene of one title; it is not a general ranking of the drivers. Any driver-specific behavior
+  goes behind a driver id check with a dated note here, never behind a build flag.

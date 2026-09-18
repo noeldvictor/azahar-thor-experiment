@@ -121,6 +121,17 @@ used for FPS, power, or thermal comparisons.
   (`app_maintenance`). `.mcp.json` starts it for Claude Code.
 - `.claude/commands/goal.md` holds the current performance goal and its device procedure.
 
+### Known Issue On The Thor: Turnip GPU Fault
+
+- Since 2026-09-18 the Turnip Vulkan driver on the test unit faults the GPU at every launch
+  (kernel line `kgsl-3d0: CP: AHB bus error`, a refused write to `RB_CCU_CNTL`). E.X. Troopers
+  then freezes at the Capcom logo. The fault is in the driver, not in this fork: the unmodified
+  build faults the same way, and OpenGL and the system Qualcomm Vulkan driver do not.
+- Workaround: select the system GPU driver in the app. On it E.X. Troopers holds 60 FPS at the
+  save-slot screen where Turnip gave 40 FPS. Expanded geometry draws stay in software on that
+  driver because they hang it; they run on Turnip.
+- The `gpu_faults` MCP tool counts the kernel lines. AGENTS.md has the evidence and the rules.
+
 ### Guards
 
 - Missing or stale ROM entries stop before launch instead of continuing into emulation.
