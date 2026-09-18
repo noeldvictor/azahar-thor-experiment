@@ -314,9 +314,9 @@ bool TextureRuntime::Reinterpret(Surface& source, Surface& dest,
     if (src_format == PixelFormat::D24S8 && dst_format == PixelFormat::RGBA8) {
         blit_helper.ConvertDS24S8ToRGBA8(source, dest, copy);
     } else {
-        LOG_WARNING(Render_Vulkan, "Unimplemented reinterpretation {} -> {}",
-                    VideoCore::PixelFormatAsString(src_format),
-                    VideoCore::PixelFormatAsString(dst_format));
+        LOG_WARNING(Render_Vulkan, "Unimplemented reinterpretation {}({}) -> {}({})",
+                    VideoCore::PixelFormatAsString(src_format), vk::to_string(source.traits.native),
+                    VideoCore::PixelFormatAsString(dst_format), vk::to_string(dest.traits.native));
         return false;
     }
     return true;
@@ -597,7 +597,7 @@ bool TextureRuntime::BlitTextures(Surface& source, Surface& dest,
 
     const RecordParams params = {
         .aspect = source.Aspect(),
-        .filter = MakeFilter(source.pixel_format),
+        .filter = vk::Filter::eNearest,
         .pipeline_flags = source.PipelineStageFlags() | dest.PipelineStageFlags(),
         .src_access = source.AccessFlags(),
         .dst_access = dest.AccessFlags(),
@@ -1305,7 +1305,9 @@ vk::ImageView Surface::ImageView(ViewType view_type, Type type) noexcept {
     auto aspect = traits.aspect;
 
     if (view_type == ViewType::Storage) {
-        ASSERT(traits.native == vk::Format::eR8G8B8A8Unorm);
+        ASSERT_MSG(traits.storage_support,
+                   "Creating a storage-view for format({}) which doesn't have storage-support!",
+                   vk::to_string(traits.native));
         is_storage = true;
     }
     if (view_type == ViewType::Depth || view_type == ViewType::Stencil) {
@@ -1372,7 +1374,7 @@ void Surface::BlitScale(const VideoCore::TextureBlit& blit, bool up_scale) {
     const auto dst_type = up_scale ? Type::Scaled : Type::Base;
     const RecordParams params = {
         .aspect = Aspect(),
-        .filter = MakeFilter(pixel_format),
+        .filter = vk::Filter::eNearest,
         .pipeline_flags = PipelineStageFlags(),
         .src_access = AccessFlags(),
         .dst_access = AccessFlags(),

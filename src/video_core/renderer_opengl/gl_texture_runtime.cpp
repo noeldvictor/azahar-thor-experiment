@@ -113,8 +113,8 @@ static constexpr std::array<FormatTuple, 8> CUSTOM_TUPLES = {{
 
 } // Anonymous namespace
 
-TextureRuntime::TextureRuntime(const Driver& driver_, VideoCore::RendererBase& renderer)
-    : driver{driver_}, current_resource_tick{0}, blit_helper{driver} {
+TextureRuntime::TextureRuntime(const Driver& driver_, VideoCore::RendererBase& renderer_)
+    : driver{driver_}, renderer{renderer_}, blit_helper{driver} {
     for (std::size_t i = 0; i < draw_fbos.size(); ++i) {
         draw_fbos[i].Create();
         read_fbos[i].Create();
@@ -124,12 +124,10 @@ TextureRuntime::TextureRuntime(const Driver& driver_, VideoCore::RendererBase& r
 TextureRuntime::~TextureRuntime() = default;
 
 u64 TextureRuntime::GetResourceTick() {
-    return current_resource_tick;
+    return renderer.GetCurrentFrame();
 }
 
-void TextureRuntime::Finish() {
-    current_resource_tick++;
-}
+void TextureRuntime::Finish() {}
 
 bool TextureRuntime::NeedsConversion(const Surface& surface) const {
     const auto& pixel_format = surface.pixel_format;
@@ -189,9 +187,9 @@ bool TextureRuntime::Reinterpret(Surface& source, Surface& dest,
     } else if (src_format == PixelFormat::RGBA4 && dst_format == PixelFormat::RGB5A1) {
         blit_helper.ConvertRGBA4ToRGB5A1(source, dest, copy);
     } else {
-        LOG_WARNING(Render_OpenGL, "Unimplemented reinterpretation {} -> {}",
-                    VideoCore::PixelFormatAsString(src_format),
-                    VideoCore::PixelFormatAsString(dst_format));
+        LOG_WARNING(Render_OpenGL, "Unimplemented reinterpretation {}({:#x}) -> {}({:#x})",
+                    VideoCore::PixelFormatAsString(src_format), source.Tuple().internal_format,
+                    VideoCore::PixelFormatAsString(dst_format), dest.Tuple().internal_format);
         return false;
     }
     return true;
@@ -314,9 +312,7 @@ bool TextureRuntime::BlitTextures(Surface& source, Surface& dest,
     // Note: shadow map is treated as RGBA8 format in PICA, as well as in the rasterizer cache, but
     // doing linear intepolation componentwise would cause incorrect value.
     const GLbitfield buffer_mask = MakeBufferMask(source.type);
-    const bool is_shadow_map = True(source.flags & SurfaceFlagBits::ShadowSource);
-    const GLenum filter =
-        buffer_mask == GL_COLOR_BUFFER_BIT && !is_shadow_map ? GL_LINEAR : GL_NEAREST;
+    constexpr GLenum filter = GL_NEAREST;
     glBlitFramebuffer(blit.src_rect.left, blit.src_rect.bottom, blit.src_rect.right,
                       blit.src_rect.top, blit.dst_rect.left, blit.dst_rect.bottom,
                       blit.dst_rect.right, blit.dst_rect.top, buffer_mask, filter);
@@ -638,7 +634,7 @@ void Surface::BlitScale(const VideoCore::TextureBlit& blit, bool up_scale) {
     Attach(GL_DRAW_FRAMEBUFFER, blit.dst_level, blit.dst_layer, up_scale);
 
     const GLenum buffer_mask = MakeBufferMask(type);
-    const GLenum filter = buffer_mask == GL_COLOR_BUFFER_BIT ? GL_LINEAR : GL_NEAREST;
+    constexpr GLenum filter = GL_NEAREST;
     glBlitFramebuffer(blit.src_rect.left, blit.src_rect.bottom, blit.src_rect.right,
                       blit.src_rect.top, blit.dst_rect.left, blit.dst_rect.bottom,
                       blit.dst_rect.right, blit.dst_rect.top, buffer_mask, filter);

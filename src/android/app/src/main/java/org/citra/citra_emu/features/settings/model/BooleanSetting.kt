@@ -95,13 +95,14 @@ enum class BooleanSetting(
         false
     ),
     CPU_JIT(SettingKeys.use_cpu_jit(), Settings.SECTION_CORE, true),
+    USE_FASTINTERP(SettingKeys.use_fastinterp(), Settings.SECTION_CORE, true),
     HW_SHADER(SettingKeys.use_hw_shader(), Settings.SECTION_RENDERER, true),
     SHADER_JIT(SettingKeys.use_shader_jit(), Settings.SECTION_RENDERER, true),
     VSYNC(SettingKeys.use_vsync(), Settings.SECTION_RENDERER, false),
     USE_SKIP_DUPLICATE_FRAMES(
         SettingKeys.use_skip_duplicate_frames(),
         Settings.SECTION_RENDERER,
-        true
+        false
     ),
     USE_FRAME_LIMIT(SettingKeys.use_frame_limit(), Settings.SECTION_RENDERER, true),
     ECO_TURBO(SettingKeys.eco_turbo(), Settings.SECTION_RENDERER, true),
@@ -163,6 +164,7 @@ enum class BooleanSetting(
             VSYNC,
             DEBUG_RENDERER,
             CPU_JIT,
+            USE_FASTINTERP,
             ASYNC_CUSTOM_LOADING,
             SHADERS_ACCURATE_MUL,
             USE_ARTIC_BASE_CONTROLLER,
