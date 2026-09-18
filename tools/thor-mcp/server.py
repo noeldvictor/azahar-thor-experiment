@@ -555,7 +555,7 @@ def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25
     driver against its zip), clear_redirect (delete the driver's file redirect directory),
     reinstall_driver (re-extract the selected or the given zip from gpu_drivers), system_driver
     (switch to the system Vulkan driver). The app is stopped before and after."""
-    ops = {"list", "verify", "clear_redirect", "reinstall_driver", "system_driver"}
+    ops = {"list", "verify", "clear_redirect", "export_redirect", "reinstall_driver", "system_driver"}
     if op not in ops:
         raise ValueError(f"op must be one of {sorted(ops)}")
     stop()

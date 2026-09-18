@@ -9282,3 +9282,18 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   The panels' refresh setting could not be changed from the shell. Kernel view: `hwcg=1`,
   `ifpc=1`, `force_no_nap=1`, `min_pwrlevel=1`, all root-only; the performance mode only moves
   `min_pwrlevel`. Open test: a fifteen-minute cool-down with the app stopped, then one launch.
+- Device fault, third pass (2026-09-18 evening). The kernel line is rate limited
+  (`gen7_err_callback: 202 callbacks suppressed`): the errors are continuous while the app
+  lives, and the five-second groups are the fault-tolerance replays of the same command.
+  `CP_RL_ERROR_DETAILS_0 = 0x10008e07` names register 0x8e07, `RB_CCU_CNTL`, the render
+  backend cache control register that Turnip writes when it programs its color cache layout.
+  A bus error on that access, not a protection violation, means the render backend did not
+  accept the access. Trials that did not change the result: every Thor performance mode
+  (GPU floor 401, 550, 615 MHz), asynchronous presentation off, the newest Turnip build
+  (v26.3.0-20260918-r6, Mesa main), rotation lock in each orientation, the dump environment
+  (`FD_RD_DUMP`, `TU_DEBUG=rd`; it only slows submissions and the fault still comes later),
+  and a scheduler built without its worker thread, which turned out to execute nothing and is
+  void. The system Qualcomm Vulkan driver never logs the fault. The validation layer loaded
+  with the system driver and reported nothing. Kernel GPU init is normal; the only kernel
+  warning of the boot is the fan driver's sysfs read. New tools from this pass: `driver_env`,
+  `app_maintenance export_redirect`.

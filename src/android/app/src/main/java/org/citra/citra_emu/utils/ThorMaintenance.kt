@@ -23,7 +23,7 @@ import org.json.JSONObject
  * request. There is no exported component; only the user directory can trigger this.
  *
  * Request file: line 1 = op, line 2 = zip name (optional).
- * Ops: list, verify, clear_redirect, reinstall_driver, system_driver.
+ * Ops: list, verify, clear_redirect, export_redirect, reinstall_driver, system_driver.
  */
 object ThorMaintenance {
     private const val REQUEST_NAME = "thor_maintenance.txt"
@@ -83,6 +83,28 @@ object ThorMaintenance {
                     result.put("zip", zip.first)
                     result.put("installed", GpuDriverHelper.installCustomDriverPartial(zip.second))
                     result.put("driver", verifyDriver(driverDir))
+                }
+                "export_redirect" -> {
+                    // Copy the driver's file redirect tree into log/redirect in the user directory
+                    // so that command stream dumps can be pulled over ADB.
+                    val userPath = DirectoryInitialization.userPath
+                        ?: throw IllegalStateException("no user directory")
+                    val root = DocumentFile.fromTreeUri(context, Uri.parse(userPath))
+                        ?: throw IllegalStateException("user directory not granted")
+                    val logDir = root.findFile("log") ?: root.createDirectory("log")!!
+                    logDir.findFile("redirect")?.delete()
+                    val out = logDir.createDirectory("redirect")!!
+                    var copied = 0
+                    redirectDir.walkTopDown().filter { it.isFile }.forEach { f ->
+                        val name = f.relativeTo(redirectDir).path.replace('/', '_')
+                        val target = out.createFile("application/octet-stream", name) ?: return@forEach
+                        context.contentResolver.openOutputStream(target.uri)?.use { o ->
+                            f.inputStream().use { i -> i.copyTo(o) }
+                        }
+                        copied++
+                    }
+                    result.put("copied", copied)
+                    result.put("redirect", listTree(redirectDir, 200))
                 }
                 "system_driver" -> {
                     GpuDriverHelper.installDefaultDriver()

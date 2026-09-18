@@ -1636,3 +1636,10 @@
   and no Turnip build avoids it; software vertex shaders avoid the stall but not the fault.
   Until the cause is found, take Vulkan measurements only after `gpu_faults` shows no new
   burst during the run, and prefer scenes reached without a fresh launch.
+- Thor GPU fault, decoded (2026-09-18 evening): the failing access is a write to
+  `RB_CCU_CNTL` (0x8e07), issued by Turnip for every command buffer, refused by the render
+  backend on this unit since 12:44 on every Turnip build and every setting, never on the
+  system Qualcomm driver, never on OpenGL. That is outside this fork's code. Report it to the
+  Turnip package maintainer with the kernel line and the register. Until it clears, measure
+  Vulkan work in scenes reached without a fresh launch or on the OpenGL backend, and keep
+  `gpu_faults` around every run.
