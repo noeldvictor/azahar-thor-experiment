@@ -74,6 +74,15 @@ The tools depend on these facts: package `org.azahar_emu.azahar.debug`, user dir
 `/storage/emulated/0/Azaharuser`, ROM tree `2664-21DE:Roms/n3ds`, USB serial `c3ca0370`. Change
 them in `.mcp.json` when the device changes.
 
+## Performance expectation on the Thor
+
+The 3DS GPU is a 268 MHz PICA200 that draws 400x240 and 320x240 frames. The Thor's Adreno 740
+has hundreds of times that throughput. A 3DS scene at 2x or 3x that keeps the Adreno 740 near
+100% busy, or that draws 6 to 7 W, is an emulator inefficiency, never a hardware limit. Treat
+GPU busy percent at a fixed frame rate as the primary efficiency number, and treat any scene
+that cannot hold full speed at 2x as a bug to find in the render path: pass restarts, tile
+loads and stores, needless copies, needless downloads. Do not accept it as the game's cost.
+
 ## Finishing a task
 
 Cleanup is part of finishing. Before you hand work back, remove the stale CMake configuration
