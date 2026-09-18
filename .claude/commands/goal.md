@@ -46,7 +46,11 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
   software because they keep state between invocations. Accelerated draws rose from 33% to 95%
   on the save-slot screen with no frame rate change: the pass restarts hold the GPU there.
 - Pass restarts per swap: 121 to 140 color target switches, 28 depth toggles, 39 to 45 render
-  area changes. Two merging candidates are written and switched off; their A/B is pending.
+  area changes. The full-render-area and depth-retention changes are on and measured: GPU
+  busy 99.9% to 91.5% at a steady 60 FPS on the save-slot screen (system driver). The color
+  target switches remain the next target.
+- Driver: Turnip faults on this unit (see AGENTS.md); the system Qualcomm driver is the bench.
+  On it the engine scene holds 51 FPS at 99.9% GPU at 2x; Turnip held 60 FPS at 62.6% there.
 - Blocker (2026-09-18 afternoon): every Vulkan launch faults the GPU one to three seconds in,
   on the control build too, after a warm reboot too. Use `gpu_faults` before and after every
   Vulkan run. Next test: full power-off of the handheld. See AGENTS.md.

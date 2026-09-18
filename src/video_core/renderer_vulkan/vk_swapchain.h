@@ -66,6 +66,11 @@ public:
         return image_count;
     }
 
+    /// Forces the next present to rebuild the swapchain, for example after a stalled acquire.
+    void MarkForRecreation() {
+        needs_recreation = true;
+    }
+
     bool NeedsRecreation() const {
         return needs_recreation;
     }

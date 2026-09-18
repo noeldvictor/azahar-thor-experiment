@@ -510,6 +510,10 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
 #endif
 
     AcquiredSwapchainImage acquired_image;
+    // Acquire retries in a row. When the GPU faults, the compositor keeps every image and the
+    // acquire never succeeds. After a bound the swapchain is rebuilt instead of spinning forever.
+    u32 acquire_retries = 0;
+    constexpr u32 acquire_retry_limit = 4000;
     for (;;) {
         switch (swapchain.AcquireNextImage(frame->image_acquired, acquired_image)) {
         case SwapchainAcquireResult::Success:
@@ -522,6 +526,14 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
             restore_frame();
             return;
         case SwapchainAcquireResult::Retry:
+            if (++acquire_retries >= acquire_retry_limit) {
+                LOG_WARNING(Render_Vulkan,
+                            "Swapchain acquire stalled for {} retries; rebuilding the swapchain",
+                            acquire_retries);
+                swapchain.MarkForRecreation();
+                restore_frame();
+                return;
+            }
             // A blocking acquire must not retain the host-synchronization lock needed by the
             // present thread to return prior images. This slow recovery path sleeps after the
             // finite Vulkan timeout rather than burning a CPU core in a zero-timeout spin.

@@ -1651,3 +1651,22 @@
   40 FPS with 33.7 ms P95 on Turnip R8 this morning, both at 99.9% GPU busy at 2x. That is one
   scene of one title; it is not a general ranking of the drivers. Any driver-specific behavior
   goes behind a driver id check with a dated note here, never behind a build flag.
+- Render pass merging, accepted (2026-09-18 evening). `RasterizerVulkan::Draw` begins a pass
+  with the framebuffer's full rectangle when that rectangle is at most twice the draw
+  rectangle's area (`kFullRenderArea`), and keeps the open pass's depth attachment for a draw
+  that neither tests nor writes depth when the same color and depth buffers are still bound
+  (`kRetainDepthAttachment`). The dynamic scissor still limits every draw to its rectangle,
+  and a pass that started without depth stays without it. Matched on the Thor with the system
+  Qualcomm Vulkan driver at the E.X. Troopers save-slot screen, 2x, same session, two runs
+  each: base 57.9 and 58.9 FPS at 99.9% GPU busy; both changes on 59.3 and 59.3 FPS at 91.8%
+  and 91.3%. The full rectangle alone gave 95.6%; the depth retention alone gave no change.
+  The pictures match the reference. Keep both on. The color target switches, 121 to 140 per
+  swap, remain and are the next target; they need the game's render-to-texture pattern
+  understood, not a pass-level trick.
+- GPU keepalive, rejected (2026-09-18 evening): an empty submission every 40 ms to hold the
+  GPU out of inter-frame power collapse did not stop the Turnip fault; it produced more fault
+  lines and the same stall. Do not restore it.
+- Stalled acquire recovery (2026-09-18 evening, untested on a fault): after 4000 acquire
+  retries the present window marks the swapchain for recreation instead of spinning forever.
+  On a GPU that never completes its work the recreate path waits on the queue; measure it on
+  the next fault before you rely on it.

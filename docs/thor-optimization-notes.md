@@ -9297,3 +9297,16 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   with the system driver and reported nothing. Kernel GPU init is normal; the only kernel
   warning of the boot is the fan driver's sysfs read. New tools from this pass: `driver_env`,
   `app_maintenance export_redirect`.
+- Driver comparison, control build, 2x (2026-09-18 evening). System Qualcomm Vulkan driver:
+  save-slot screen 56.6 to 59.3 FPS, 16.86 ms P95, 99.9% GPU; engine scene after the intro
+  51.2 FPS, 33.7 ms P95, 99.9% GPU, 680 MHz, emulation thread 80.7% of a core. Turnip R8 this
+  morning on the same scenes: save-slot about 40 FPS with 33.7 ms P95 at 99.9%; engine scene
+  60 FPS at 62.6% GPU. Turnip is the faster driver in the 3D scene when it works; the system
+  driver is faster at the menu. Neither reaches 3x.
+- Pass merging matrix on the system driver, save-slot screen, 2x, one session:
+  base 54.2 / 57.9 / 58.9 FPS at 99.9% GPU; depth retention alone 55.0 FPS at 99.9%; full
+  render area alone 59.3 FPS, 16.86 ms P95, 95.6%; both 59.3 / 59.3 / 59.3 FPS at 91.2 / 91.8
+  / 91.3%. Screenshot difference against the reference 2.3 to 3.1 in all runs. Both switches
+  are on from this commit. Installed at the end: production APK SHA-256
+  `8675d2c0f53f6add1347d11489d6ef3a36eb80513b2eca8710dd3168f070623e`.
+- Keepalive trial on Turnip: 140 fault lines at launch and the same stall. Rejected.
