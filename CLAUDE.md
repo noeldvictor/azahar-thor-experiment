@@ -14,6 +14,8 @@ It does not repeat the ledger.
 - [AI-POLICY.md](AI-POLICY.md): how AI assistance is used here.
 - [.claude/commands/goal.md](.claude/commands/goal.md): the current performance goal and its
   procedure. Run it with `/goal`.
+- [docs/goal_history/](docs/goal_history/): a dated snapshot of each goal we have set, so the
+  goals and what they produced can be read back. Add one whenever the goal changes.
 - [tools/thor-mcp/server.py](tools/thor-mcp/server.py): the MCP server that controls the Thor.
   See "Device control" below.
 - [tools/turnip/](tools/turnip/): the bundled Turnip driver. `build.sh` builds Mesa with the
