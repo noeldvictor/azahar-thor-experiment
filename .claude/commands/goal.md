@@ -1,12 +1,13 @@
 ---
-description: Get E.X. Troopers to 60 FPS at 2x, 3x and 4x on the AYN Thor, and to 120 FPS at 2x under fast forward. Find and remove the emulator and driver cost that stands in the way. Medarot 9 stays as the second title and keeps its frame-rate patch work.
+description: Get E.X. Troopers to 60 FPS from 2x to 4x resolutions on the AYN Thor, and to 120 FPS at 2x in fast forward. Find and remove the emulator and driver cost that stands in the way. Medarot 9 stays as the second title and keeps its frame-rate patch work.
 ---
 
-# Goal: E.X. Troopers at 60 FPS from 2x to 4x, and 120 FPS at 2x in fast forward
+# Goal: E.X. Troopers at 60 FPS from 2x to 4x resolutions, and 120 FPS at 2x in fast forward
 
 ## The target
 
-1. E.X. Troopers holds **Speed 100% at 60 FPS** in gameplay at **2x, 3x and 4x**.
+1. E.X. Troopers holds **Speed 100% at 60 FPS** in gameplay at every resolution from **2x to
+   4x**, that is 2x, 3x and 4x.
 2. With fast forward, the same scenes reach **200% speed**, which is 120 game frames per second.
    The panels are pinned at 60 Hz, so this shows on screen as 60 FPS with the game running at
    double rate. Fast forward is game speed, not frame rate.
