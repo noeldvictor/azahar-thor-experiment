@@ -408,6 +408,13 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 )") DECLARE_KEY(layouts_to_cycle) BOOST_HANA_STRING(R"(
 
 [Utility]
+# Loads a save state written by a different build of the emulator. A save state records the
+# build that wrote it, because a format change between builds would read back as nonsense.
+# This exists so a performance change can be measured against the same scene before and after
+# a rebuild. Testing only.
+# 0 (default): Off, 1: On
+)") DECLARE_KEY(allow_savestate_mismatch) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

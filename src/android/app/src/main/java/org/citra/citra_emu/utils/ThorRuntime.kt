@@ -96,7 +96,14 @@ object ThorRuntime {
                 "load_state" -> {
                     val slot = argument?.toIntOrNull() ?: 1
                     result.put("slot", slot)
-                    result.put("loaded", NativeLibrary.loadStateIfAvailable(slot))
+                    // Load directly rather than through loadStateIfAvailable, which hides a
+                    // state written by a different build of the emulator. Measuring a change
+                    // means loading the same scene before and after a rebuild, and the core
+                    // decides whether to accept it through allow_savestate_mismatch.
+                    val listed = NativeLibrary.getSavestateInfo()?.any { it.slot == slot } ?: false
+                    result.put("listed", listed)
+                    NativeLibrary.loadState(slot)
+                    result.put("loaded", true)
                 }
                 "states" -> {
                     val info = NativeLibrary.getSavestateInfo()

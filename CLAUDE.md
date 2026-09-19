@@ -73,7 +73,7 @@ of a raw `adb` command when a tool exists.
   while the emulation screen is in front and writes `log/thor_command.json`. Save a state at the
   scene you measure, then load it; a replay to a late scene costs seven minutes and a load costs
   seconds.
-- `allow_savestate_mismatch` in the Renderer settings loads a save state written by a different
+- `allow_savestate_mismatch` in the Utility settings loads a save state written by a different
   build, so a change can be measured against the same scene before and after a rebuild. Set it
   with `config_set`. It is off by default; a state whose format really changed will crash, so it
   is for testing only.

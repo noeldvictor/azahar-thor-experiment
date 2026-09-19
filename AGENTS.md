@@ -1818,3 +1818,16 @@
   `adb connect <ip>:<port>` with the address from Settings, Developer options, Wireless
   debugging, then pass that as `THOR_SERIAL`. The old fixed `adb tcpip 5555` address in these
   notes no longer answers.
+- Save states across builds, working as of 2026-09-19. Three things were needed and all three
+  matter: the setting `allow_savestate_mismatch` in `[Utility]`, a declaration for it in
+  `jni/default_ini.h` because the Android config asserts at startup on any key it does not know,
+  and a direct call to `NativeLibrary.loadState` in `ThorRuntime`, because
+  `loadStateIfAvailable` hides a state written by another build before the core ever sees it.
+  Set the value under `[Utility]`, not `[Renderer]`; a value in the wrong section is silently
+  ignored and looks exactly like the feature not working.
+- Save a state during free movement, never during a tutorial box or a cutscene. States saved at
+  a tutorial box replay the cutscene that follows it, so every load lands in a video with the
+  GPU near idle. Several measurements were thrown away for this reason on 2026-09-19.
+- The end-of-pass barrier is still unmeasured on a heavy scene. The run that appeared to clear
+  it was on a light scene and is void; the retry could not hold the snow field long enough. Do
+  not treat that barrier as ruled out.
