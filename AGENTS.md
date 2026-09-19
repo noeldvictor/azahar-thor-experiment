@@ -1709,3 +1709,16 @@
   first one. The stalls themselves come from outside the app: the system re-adds both display
   viewports every three seconds during each one, so the compositor holds every image for ten
   to thirteen seconds. Their trigger is open.
+- Acquire ordering, accepted (2026-09-19). The stall behind the E.X. Troopers rebuilds was an
+  ordering inversion inside the emulator: a direct-present acquire that returned not-ready
+  fell back to the copy path, later frames then acquired directly on the emulation thread,
+  and the two direct images filled the compositor's dequeued-buffer limit while the worker
+  waited for the copy frame's image. `TryPrepareDirectPresent` now counts every copy-path
+  frame in `pending_copy_acquires`; while the count is non-zero every frame takes the copy
+  path, so acquires stay in submission order, and the worker releases the count when its
+  acquire completes. The emulation thread never waits for an image. A rejected variant made
+  the emulation thread retry the direct acquire for up to half a second: it cost one vsync per
+  window per frame and held the snow field at 30 FPS with the GPU at 68% (same field FPS
+  afterwards, so that scene is 30 FPS by the game's own loop; the mech fight is 60). Result:
+  two nine-minute runs with zero stalls and zero rebuilds, and the present-thread timeout lines
+  fell from thousands to under 200 per run.

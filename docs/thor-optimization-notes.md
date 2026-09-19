@@ -9369,3 +9369,14 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   51.2 FPS at 99.9%. Device left with the app stopped, `svc power stayon false`, performance
   mode 2, fan mode 4, brightness 255. WSL: 700 MB of archives removed, the 2.6 GB build tree in
   `/root/turnip-thor` kept for rebuilds. Workspace: `tmp/mesa` (20 MB) removed.
+- Acquire ordering runs (2026-09-19). Build with the emulation-thread retry (APK SHA-256
+  `68ba46da565ac2fe577af1d8be46da96438f029b4381e367a93222ce8d4e5f0d`): nine minutes, zero
+  stalls, zero rebuilds, 195 dequeue-timeout lines; snow field 27 to 30 FPS, P95 50.6 ms,
+  GPU 68 to 70%, emulation thread 34 to 36%. Build with the pending-copy rule (APK SHA-256
+  `e7967319544c1322d5dd5b193cdaff02217678b1ab21d5a3bea8b459d74aebba`): nine minutes, zero
+  stalls, zero rebuilds, 24 dequeue-timeout lines; snow field 27.0 to 27.8 FPS mean over four
+  samples, median 33.71 ms, P95 50.57 ms, GPU 67.7 to 69.0%, emulation thread 33.5 to 35.0%,
+  guest overlay 29 FPS, zero fault lines. Flash check in that scene: 15-second screen
+  recordings of both panels, per-frame average luma within 0.5 of the median on the main
+  panel (400 frames) and on the second panel (494 frames); no flash frame. The reported
+  flashes coincided with automated A presses opening tutorial boxes.

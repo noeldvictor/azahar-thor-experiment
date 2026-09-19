@@ -40,6 +40,8 @@ struct Frame {
     bool direct_present{};
     // Swapchain generation that owns present_image_index. A rebuilt swapchain invalidates it.
     u32 present_generation{};
+    // The frame took the copy path and its image acquire on the worker is still pending.
+    bool copy_acquire_pending{};
     // LibRetro owns its presentation command buffers and synchronization separately.
     vk::Semaphore render_ready{};
     vk::Fence present_done{};
@@ -134,6 +136,9 @@ private:
     void* last_render_surface{};
     // Incremented by every swapchain rebuild. Guarded by swapchain_mutex.
     u32 swapchain_generation{};
+    // Copy-path frames whose worker acquire has not completed. While it is non-zero no frame
+    // acquires directly, so acquires stay in submission order. Guarded by swapchain_mutex.
+    u32 pending_copy_acquires{};
 };
 
 } // namespace Vulkan

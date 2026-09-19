@@ -307,17 +307,28 @@ Frame* PresentWindow::GetRenderFrame() {
 #ifdef ANDROID
 bool PresentWindow::TryPrepareDirectPresent(Frame* frame) {
     std::scoped_lock lock{swapchain_mutex};
+    // A copy-path frame acquires its image on the worker at submission time. If a later frame
+    // acquired directly here first, the two direct images would hold the compositor's
+    // dequeued-buffer limit and the worker would wait for an image that only the present of
+    // those later frames can free, which the rebuild bound then breaks (E.X. Troopers,
+    // 2026-09-18). So while any copy acquire is pending, every frame takes the copy path and
+    // acquires in submission order. The emulation thread never waits here.
+    const auto take_copy_path = [this, frame] {
+        frame->copy_acquire_pending = true;
+        ++pending_copy_acquires;
+        return false;
+    };
     const vk::Extent2D extent = swapchain.GetExtent();
-    if (swapchain.NeedsRecreation() ||
+    if (pending_copy_acquires != 0 || swapchain.NeedsRecreation() ||
         !CanRenderDirectToSwapchain(frame->width, frame->height, extent.width, extent.height) ||
         direct_framebuffers.size() != swapchain.GetImageCount()) {
-        return false;
+        return take_copy_path();
     }
 
     AcquiredSwapchainImage acquired_image;
     if (swapchain.AcquireNextImage(frame->image_acquired, acquired_image) !=
         SwapchainAcquireResult::Success) {
-        return false;
+        return take_copy_path();
     }
 
     frame->present_image = acquired_image.image;
@@ -509,6 +520,12 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
     std::unique_lock swapchain_lock{swapchain_mutex};
     frame->present_valid = false;
     frame->direct_present = false;
+    // Runs with swapchain_lock held on every exit of the acquire below.
+    const auto finish_copy_acquire = [this, frame] {
+        if (std::exchange(frame->copy_acquire_pending, false)) {
+            --pending_copy_acquires;
+        }
+    };
 
 #ifndef ANDROID
     const bool use_vsync = Settings::values.use_vsync.GetValue();
@@ -517,6 +534,7 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
     const bool vsync_changed = vsync_enabled != use_vsync;
     if (vsync_changed || size_changed) [[unlikely]] {
         vsync_enabled = use_vsync;
+        finish_copy_acquire();
         restore_frame();
         return;
     }
@@ -538,6 +556,7 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
             frame->present_valid = true;
             break;
         case SwapchainAcquireResult::Recreate:
+            finish_copy_acquire();
             restore_frame();
             return;
         case SwapchainAcquireResult::Retry:
@@ -546,6 +565,7 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
                             "Swapchain acquire stalled for {} retries; rebuilding the swapchain",
                             acquire_retries);
                 swapchain.MarkForRecreation();
+                finish_copy_acquire();
                 restore_frame();
                 return;
             }
@@ -559,6 +579,7 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
         }
         break;
     }
+    finish_copy_acquire();
 
     const vk::Extent2D extent = swapchain.GetExtent();
     VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::PresentFrames);
