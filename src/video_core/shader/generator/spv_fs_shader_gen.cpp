@@ -337,20 +337,23 @@ void FragmentModule::WriteLighting() {
     }
 
     const auto lookup_lighting_lut_unsigned = [this](Id lut_index, Id pos) -> Id {
-        const Id pos_floor{OpFloor(f32_id, OpFMul(f32_id, pos, ConstF32(256.f)))};
-        const Id index_float{OpFClamp(f32_id, pos_floor, ConstF32(0.f), ConstF32(255.f))};
+        // Scale once and reuse it for the index and the delta. index_float is already the
+        // integral value, so negating it directly avoids converting to an integer and back.
+        const Id scaled{OpFMul(f32_id, pos, ConstF32(256.f))};
+        const Id index_float{OpFClamp(f32_id, OpFloor(f32_id, scaled), ConstF32(0.f),
+                                      ConstF32(255.f))};
         const Id index{OpConvertFToS(i32_id, index_float)};
-        const Id neg_index{OpFNegate(f32_id, OpConvertSToF(f32_id, index))};
-        const Id delta{OpFma(f32_id, pos, ConstF32(256.f), neg_index)};
+        const Id delta{OpFAdd(f32_id, scaled, OpFNegate(f32_id, index_float))};
         return LookupLightingLUT(lut_index, index, delta);
     };
 
     const auto lookup_lighting_lut_signed = [this](Id lut_index, Id pos) -> Id {
-        const Id pos_floor{OpFloor(f32_id, OpFMul(f32_id, pos, ConstF32(128.f)))};
-        const Id index_float{OpFClamp(f32_id, pos_floor, ConstF32(-128.f), ConstF32(127.f))};
+        // Same two savings as the unsigned lookup above.
+        const Id scaled{OpFMul(f32_id, pos, ConstF32(128.f))};
+        const Id index_float{OpFClamp(f32_id, OpFloor(f32_id, scaled), ConstF32(-128.f),
+                                      ConstF32(127.f))};
         const Id index{OpConvertFToS(i32_id, index_float)};
-        const Id neg_index{OpFNegate(f32_id, OpConvertSToF(f32_id, index))};
-        const Id delta{OpFma(f32_id, pos, ConstF32(128.f), neg_index)};
+        const Id delta{OpFAdd(f32_id, scaled, OpFNegate(f32_id, index_float))};
         const Id increment{
             OpSelect(i32_id, OpSLessThan(bool_id, index, ConstS32(0)), ConstS32(256), ConstS32(0))};
         return LookupLightingLUT(lut_index, OpIAdd(i32_id, index, increment), delta);

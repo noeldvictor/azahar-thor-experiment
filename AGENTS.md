@@ -1870,3 +1870,14 @@
 - Save a snow field state with the character standing still. States captured while running land
   the character on a scene trigger, and the cutscene starts before a measurement can be taken.
   Slot 5 measured correctly once and has landed in a cutscene on every attempt since.
+- Snow field benchmark, stable (2026-09-19). Save states 1, 2, 3 and 5 hold the snow field with
+  the character standing still, captured while the user held position rather than ran. They
+  reload into the same scene every time: 107.7% and 108.4% speed on two consecutive loads,
+  frame 15.5 and 15.4 ms, GPU 99.3 and 99.9% at 680 MHz. Every earlier state was captured
+  mid-run and landed on a scene trigger, so the cutscene started before a measurement finished.
+  All older states for this title are deleted. Use slot 5 and confirm with a screenshot.
+- Lighting lookup helpers, tightened (2026-09-19). `lookup_lighting_lut_unsigned` and
+  `lookup_lighting_lut_signed` scaled the position twice, once for the floor and again inside
+  the delta, and converted the index to an integer and back purely to negate it. The scale is
+  computed once and the already integral clamped value is negated directly. A light pays this
+  once per lookup table it samples.
