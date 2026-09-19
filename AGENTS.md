@@ -1852,3 +1852,21 @@
   does not lower RelaxedPrecision to 16 bit for Vulkan. Getting 16 bit arithmetic needs explicit
   `OpTypeFloat 16` values in the generator behind `VK_KHR_shader_float16_int8`, which is a much
   larger change to `spv_fs_shader_gen.cpp`. Do not retry the decoration approach.
+- Fragment lighting is where the per-pixel cost goes, not the texture combiner (2026-09-19).
+  The machine code of a 247 instruction shader is 59 multiply-add, 56 add, 35 multiply, 23 nop,
+  10 min/max and only 5 texture operations, so about 150 float operations per pixel with almost
+  no texturing. `WriteLighting` emits roughly 48 SPIR-V operations per light and the scene uses
+  several, which accounts for it. Earlier notes calling the combiner the cause were wrong.
+- Vector normalises in the lighting path, hoisted (2026-09-19). `normalize(view)` was computed
+  inside the per-light loop although the view vector is the same for every light, and both
+  `normalize(view)` and `normalize(half_vector)` were recomputed inside `get_lut_value`, which
+  a light calls once per lookup table it samples. The view normalise is now computed once per
+  shader and the half vector once per light. Each normalise is a dot product, a reciprocal
+  square root and three multiplies. Static effect on the snow field shader set: mean 217 to 183
+  instructions, median 235 to 218, minimum 83 to 72.
+  **Not yet validated on the device.** Every save state of the snow field now loads into a
+  cutscene within two seconds, so the reading the goal requires could not be taken. Take it
+  before treating this as accepted.
+- Save a snow field state with the character standing still. States captured while running land
+  the character on a scene trigger, and the cutscene starts before a measurement can be taken.
+  Slot 5 measured correctly once and has landed in a cutscene on every attempt since.

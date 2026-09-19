@@ -220,6 +220,9 @@ void FragmentModule::WriteLighting() {
     Id light_distance{ConstF32(0.f)};
     Id spot_dir{ConstF32(0.f, 0.f, 0.f)};
     Id half_vector{ConstF32(0.f, 0.f, 0.f)};
+    // half_vector changes per light, so this is refreshed once per light rather than once
+    // per lookup table that light samples.
+    Id normalized_half_vector{ConstF32(0.f, 0.f, 0.f)};
     Id dot_product{ConstF32(0.f)};
     Id clamp_highlights{ConstF32(1.f)};
     Id geo_factor{ConstF32(1.f)};
@@ -355,19 +358,23 @@ void FragmentModule::WriteLighting() {
 
     // Samples the specified lookup table for specular lighting
     const Id view{OpLoad(vec_ids.Get(3), view_id)};
+
+    // The view vector is the same for every light and every lookup, so normalise it once. Each
+    // normalise costs a dot product, a reciprocal square root and three multiplies, and this one
+    // used to be repeated for every light and again for every lookup that light performed.
+    const Id normalized_view{OpNormalize(vec_ids.Get(3), view)};
     const auto get_lut_value = [&](LightingRegs::LightingSampler sampler, u32 light_num,
                                    LightingRegs::LightingLutInput input, bool abs) -> Id {
         Id index{};
         switch (input) {
         case LightingRegs::LightingLutInput::NH:
-            index = OpDot(f32_id, normal, OpNormalize(vec_ids.Get(3), half_vector));
+            index = OpDot(f32_id, normal, normalized_half_vector);
             break;
         case LightingRegs::LightingLutInput::VH:
-            index = OpDot(f32_id, OpNormalize(vec_ids.Get(3), view),
-                          OpNormalize(vec_ids.Get(3), half_vector));
+            index = OpDot(f32_id, normalized_view, normalized_half_vector);
             break;
         case LightingRegs::LightingLutInput::NV:
-            index = OpDot(f32_id, normal, OpNormalize(vec_ids.Get(3), view));
+            index = OpDot(f32_id, normal, normalized_view);
             break;
         case LightingRegs::LightingLutInput::LN:
             index = OpDot(f32_id, light_vector, normal);
@@ -381,7 +388,6 @@ void FragmentModule::WriteLighting() {
                 // Note: even if the normal vector is modified by normal map, which is not the
                 // normal of the tangent plane anymore, the half angle vector is still projected
                 // using the modified normal vector.
-                const Id normalized_half_vector{OpNormalize(vec_ids.Get(3), half_vector)};
                 const Id normal_dot_half_vector{OpDot(f32_id, normal, normalized_half_vector)};
                 const Id normal_mul_dot{
                     OpVectorTimesScalar(vec_ids.Get(3), normal, normal_dot_half_vector)};
@@ -438,7 +444,8 @@ void FragmentModule::WriteLighting() {
         light_vector = OpNormalize(vec_ids.Get(3), light_vector);
 
         spot_dir = GetLightMember(5);
-        half_vector = OpFAdd(vec_ids.Get(3), OpNormalize(vec_ids.Get(3), view), light_vector);
+        half_vector = OpFAdd(vec_ids.Get(3), normalized_view, light_vector);
+        normalized_half_vector = OpNormalize(vec_ids.Get(3), half_vector);
 
         // Compute dot product of light_vector and normal, adjust if lighting is one-sided or
         // two-sided
