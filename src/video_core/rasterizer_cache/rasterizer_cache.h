@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <string>
+
+#include <chrono>
+
 #include <type_traits>
 #include <boost/container/small_vector.hpp>
 #include <boost/range/iterator_range.hpp>
@@ -380,6 +384,34 @@ bool RasterizerCache<T>::AccelerateDisplayTransfer(const Pica::DisplayTransferCo
     AddFrameProfileEvent(FrameProfileEvent::AcceleratedDisplayTransfers);
     AddFrameProfileEvent(FrameProfileEvent::AcceleratedDisplayTransferPixels,
                          static_cast<u64>(dst_rect.GetWidth()) * dst_rect.GetHeight());
+#if THOR_FRAME_PROFILING
+    // Capture one short burst of transfers per second, enough to cover a frame, so the
+    // repeating pattern is visible without flooding the log.
+    {
+        static std::chrono::steady_clock::time_point window_start{};
+        static std::string batch;
+        static u32 batch_count = 0;
+        static bool capturing = false;
+        const auto now = std::chrono::steady_clock::now();
+        if (!capturing && now - window_start > std::chrono::seconds{1}) {
+            capturing = true;
+            window_start = now;
+            batch.clear();
+            batch_count = 0;
+        }
+        if (capturing) {
+            batch += fmt::format("{:#x}->{:#x} {}x{} {}->{} ", src_params.addr, dst_params.addr,
+                                 dst_rect.GetWidth(), dst_rect.GetHeight(),
+                                 PixelFormatAsString(src_surface.pixel_format),
+                                 PixelFormatAsString(dst_surface.pixel_format));
+            batch_count++;
+            if (now - window_start > std::chrono::milliseconds{20} || batch_count >= 28) {
+                capturing = false;
+                LOG_INFO(HW_GPU, "ThorXfer n={} {}", batch_count, batch);
+            }
+        }
+    }
+#endif
     runtime.BlitTextures(src_surface, dst_surface, texture_blit);
 
     InvalidateRegion(dst_params.addr, dst_params.size, dst_surface_id);

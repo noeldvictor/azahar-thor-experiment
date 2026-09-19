@@ -9437,3 +9437,17 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   the GPU throttled to 401 MHz after the SoC reached 92 C. Only the 2x limit 200 result is
   worth keeping, and only as evidence that fast forward reaches 200% where the GPU has room.
   Redo the matrix from a verified gameplay save state on a cool device.
+- Display transfer trace (2026-09-19, E.X. Troopers gameplay at 2x, save state 8). The burst
+  repeats `0x180f0800` to `0x1835dc00` 480x800, `0x1804b000` 480x640, `0x183bb800` 480x800,
+  `0x18000000` 480x640, `0x18300000` 480x800, `0x18025800` 480x640, all RGBA8 to RGB565: one
+  source, six framebuffers. Counters: 13.2 transfers and 4.55 Mpix per swap, 250 render pass
+  begins per swap, 1638 draw batches per swap, all accelerated.
+- Right eye A/B on that state, five samples each: on 83.7% speed, 49.7 FPS, frame 20.00 ms,
+  cmd 7.97, swap 5.44, rem 6.36, GPU 98.5% at 680 MHz; off 82.7%, 50.0 FPS, frame 20.18 ms,
+  cmd 8.04, swap 5.80, rem 6.11, GPU 98.7%. Transfers identical at 13.2 per swap and 4.55 Mpix.
+  No effect.
+- Standing state of this scene: GPU bound at about 98.5% with roughly 19.7 ms of GPU work per
+  frame, against 14.3 ms of CPU across command processing and guest emulation. The GPU cost is
+  spread over 250 render passes and 1638 draws, and no single component measured so far accounts
+  for it. Attributing it needs serialised per-pass timing; the overlapping timestamps already in
+  the tree cannot do it.

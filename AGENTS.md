@@ -1804,3 +1804,17 @@
   fell below its usual 615 or 680 MHz.
 - A scene reached by pressing A blindly is usually a video, where the GPU is near idle and any
   speed number is meaningless. Confirm the scene with a screenshot before recording a number.
+- Display transfers, ruled out as a target (2026-09-19). A gameplay scene issues a repeating
+  cycle of six transfers from one source surface to six framebuffers, three of 480x800 and
+  three of 480x640 at 2x, totalling 13.2 transfers and 4.55 Mpix per swap against 0.69 Mpix of
+  real screen. The size looked wrong, but 4.55 Mpix per frame is well under a millisecond on
+  this GPU and the frame is 20 ms, so this is not where the time goes. `ThorXfer` in profiling
+  builds prints one burst of transfers per second with source, destination and scaled size.
+- `disable_right_eye_render` does nothing for E.X. Troopers, as already recorded for Medarot 9.
+  The three top-screen destinations are not a left and right eye pair; transfers stayed at 13.2
+  per swap and 4.55 Mpix with the setting on and off, and speed moved 83.7 to 82.7%, inside the
+  noise. Do not try this setting again for either title.
+- Wi-Fi debugging: the Thor now uses Android wireless debugging, whose port changes each session.
+  `adb connect <ip>:<port>` with the address from Settings, Developer options, Wireless
+  debugging, then pass that as `THOR_SERIAL`. The old fixed `adb tcpip 5555` address in these
+  notes no longer answers.
