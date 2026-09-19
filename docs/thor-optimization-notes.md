@@ -9451,3 +9451,27 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   spread over 250 render passes and 1638 draws, and no single component measured so far accounts
   for it. Attributing it needs serialised per-pass timing; the overlapping timestamps already in
   the tree cannot do it.
+- Snow field reference established (2026-09-19, save state slot 5, free movement, no tutorial
+  box). It reloads to within one percent of the live scene: live 103.6% speed and 16.13 ms
+  frame, reloaded 104.6% and 15.96 ms. This is the benchmark for the goal.
+  Matrix from that state, six samples each, production build with the bundled driver:
+
+  | config | speed | FPS | frame | cmd | swap | rem | GPU |
+  |---|---|---|---|---|---|---|---|
+  | 2x limit 100 | 100.0% | 59.9 | 13.73 ms | 7.59 | 0.08 | 5.85 | 99.9% at 680 MHz |
+  | 2x limit 200 | 104.3% | 62.3 | 16.01 ms | 8.95 | 2.05 | 4.83 | 99.8% at 680 MHz |
+  | 3x limit 100 | 54.5% | 32.9 | 30.58 ms | 8.36 | 14.55 | 7.41 | 99.8% at 680 MHz |
+  | 4x limit 100 | 32.5% | 19.5 | 51.08 ms | 9.08 | 33.49 | 8.20 | 99.9% at 680 MHz |
+
+  2x at 60 FPS is met. Fast forward at 2x reaches 104%, not the 200% the goal asks for, because
+  the GPU is already at 99.8%. 3x and 4x are far short. The GPU is saturated in every row and the
+  CPU side barely moves, 7.6 to 9.1 ms of command processing across a four times range of pixels.
+- GPU time is linear in pixels: 13.7 ms at 2x, 30.6 ms at 3x (2.23 times for 2.25 times the
+  pixels), 51.1 ms at 4x (3.73 times for 4 times the pixels). Nothing fixed dominates, so the
+  per-pixel cost is the whole of the shortfall.
+- The size of the problem, stated plainly. At 2x the two screens are 800x480 and 640x480, which
+  is 0.69 Mpix of output for 13.7 ms of GPU, about 50 Mpix per second. The Adreno 740 fills on
+  the order of 9700 Mpix per second. Even allowing ten times overdraw we are spending roughly
+  twenty times what a simple textured fill would cost per pixel. Either the generated fragment
+  shaders are far more expensive than the PICA work they replace, or something per draw scales
+  with area. Measuring the shaders is the next step and nothing else should be attempted first.
