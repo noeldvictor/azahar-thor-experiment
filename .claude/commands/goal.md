@@ -1,8 +1,36 @@
 ---
-description: Run the two-title performance goal on the AYN Thor. Measure the native frame rate of Medarot 9 and E.X. Troopers at full speed, fix emulator inefficiencies found on the way, and add a 30 FPS patch code for a title that caps itself at 20 FPS.
+description: Get E.X. Troopers to 60 FPS at 2x, 3x and 4x on the AYN Thor, and to 120 FPS at 2x under fast forward. Find and remove the emulator and driver cost that stands in the way. Medarot 9 stays as the second title and keeps its frame-rate patch work.
 ---
 
-# Goal: Medarot 9 and E.X. Troopers at full speed, with 30 FPS patch codes where the game caps itself lower
+# Goal: E.X. Troopers at 60 FPS from 2x to 4x, and 120 FPS at 2x in fast forward
+
+## The target
+
+1. E.X. Troopers holds **Speed 100% at 60 FPS** in gameplay at **2x, 3x and 4x**.
+2. With fast forward, the same scenes reach **200% speed**, which is 120 game frames per second.
+   The panels are pinned at 60 Hz, so this shows on screen as 60 FPS with the game running at
+   double rate. Fast forward is game speed, not frame rate.
+3. The heaviest scene decides the result. The snow field is the reference; a menu or a video
+   proves nothing.
+
+## The premise, which is not negotiable
+
+The 3DS GPU is a 268 MHz PICA200 drawing 400x240 and 320x240. The Adreno 740 has roughly 36
+times its fill rate and hundreds of times its arithmetic throughput. 2x needs 4 times the 3DS
+pixel rate and 4x needs 16 times, so the hardware has room for both. **Any shortfall is emulator
+or driver cost, not a hardware limit.** Do not close this goal by declaring a scene too heavy.
+Find the cost and name it.
+
+## How to work on it
+
+- Measure before changing anything, and confirm the scene with a screenshot. Three plausible
+  theories died against measurement on 2026-09-19 alone.
+- Research is in scope: upstream Azahar, other forks, Mesa and Turnip issues and merge requests.
+  We build our own Turnip (`tools/turnip/`), so a driver fix is ours to make and ship.
+- Move work onto hardware that is sitting idle: the GPU, NEON on the CPU, and anything else the
+  Thor offers. A software fallback that runs every frame is a finding, not an excuse.
+- Extend the `thor` MCP server whenever an experiment needs a capability it lacks, and record the
+  tool in `azahar/CLAUDE.md`.
 
 ## Titles
 
@@ -13,8 +41,9 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
 
 ## Success
 
-1. For each title, the native frame rate at full speed is known per scene: title, menu, cutscene, gameplay. Full speed means the overlay shows `Speed: 100%`.
-2. Each title holds full speed at 2x, 3x, and 4x in gameplay. Where it does not, the cause is measured and recorded, and a code change is attempted and measured.
+1. The target above is met, or the cost that prevents it is named with numbers and a failed
+   attempt to remove it is recorded.
+2. For each title, the native frame rate at full speed is known per scene: title, menu, cutscene, gameplay. Full speed means the overlay shows `Speed: 100%`.
 3. A title that waits three vsyncs per frame by its own design gets a 30 FPS patch code as a bundled cheat under `src/android/app/src/main/assets/cheats/<title id>.txt`, verified on the Thor for speed and for game pacing. Medarot 9 has both codes and they pass the pacing check; see its status.
 4. Every emulator change follows AGENTS.md: a correctness argument, an `arm64-v8a` build, and a matched before and after measurement on the Thor. A patch code is guest-code patching and is recorded as a cheat, not as an optimization.
 
@@ -54,6 +83,44 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
   in the engine scene at 2x; Turnip R8 held 60 FPS at 62.6% there. Keep `gpu_faults` before
   and after every Vulkan run as a guard.
 - Open: the E.X. Troopers present-path freeze (AGENTS.md, 2026-09-18 night).
+
+## Where this stands on 2026-09-19
+
+Shipped today, each measured on the device: the patched Turnip that removes the GPU fault, the
+swapchain rebuild and acquire ordering that removed the freeze, the stream ring sizes that
+stopped the emulation thread waiting on the GPU, and the direct render path on the bundled
+driver. Together these took the engine scene from 48% to about 96% speed at 2x.
+
+Standing numbers in the heaviest scene reached so far, at 2x, five samples:
+
+| | value |
+|---|---|
+| Speed | 83% at 50 FPS, frame 20.0 ms |
+| GPU | 98.4% busy at 680 MHz, about 19.7 ms of work |
+| Command processing | 8.0 ms, of which the draw path is 3.2 ms |
+| Guest emulation | 6.3 ms |
+| Structure | 250 render passes, 164 colour switches, 1638 draws per frame |
+
+3x reaches about 51% and 4x about 26%, and GPU time is linear in pixels, so the per-pixel cost
+is what blocks 3x and 4x.
+
+Ruled out by measurement, with numbers in the notes, so none of these is retried: texture
+downloads, the uniform ring alone, bandwidth compression being disabled by image usage,
+low-resolution Z, the end-of-pass barrier, display transfers, and `disable_right_eye_render`.
+
+Ranked next steps:
+
+1. The per-pixel cost is unexplained and is the whole of 3x and 4x. Measure the fragment shaders
+   we generate: instruction counts and register pressure for a typical draw. A PICA texture
+   combiner emulated badly is the most likely place for a ten times per-pixel penalty.
+2. Pick tiled or direct rendering per pass by render-area size in our own Turnip build. The
+   direct path won overall because roughly 240 of the 250 passes are tiny, but it takes the tile
+   cache away from the few large blended passes. Turnip's existing flag keys on draw count,
+   which is the wrong signal, and measured worse.
+3. Re-test the end-of-pass barrier on a heavy scene. The test that cleared it ran on a light
+   scene and is not trustworthy.
+4. The geometry programs that still fall back to software, and the 33 pass restarts per frame
+   that come from render-area changes rather than the game switching targets.
 
 ## Procedure
 
