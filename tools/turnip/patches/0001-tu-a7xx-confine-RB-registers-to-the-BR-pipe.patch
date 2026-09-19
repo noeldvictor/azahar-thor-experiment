@@ -1,0 +1,58 @@
+From: azahar-thor <support@leandesignco.com>
+Subject: [PATCH] tu/a7xx: confine RB_CCU_CNTL and RB magic registers to the BR pipe
+
+tu6_init_static_regs runs while CP_SET_THREAD_BOTH is active, so the BV pipe
+executes every register write in it. The non-context render-backend registers
+(0x8e00 to 0x8eff) are reachable from the BR pipe only. Mesa already confines
+RB_DBG_ECO_CNTL, RB_RBP_CNTL, and RB_UNKNOWN_8E09 with a THREAD_MODE BR
+conditional, but not RB_CCU_CNTL and not the RB entries of the raw magic table.
+
+On the AYN Thor (Adreno 740, kernel 5.15 KGSL with CP AHB timeout detection
+armed) each of those BV writes logs "CP: AHB bus error" with the register
+number (0x10008e07, then 0x10008e79 when the first write is removed). Wrap
+both in the same BR conditional.
+
+---
+--- a/src/freedreno/vulkan/tu_cmd_buffer.cc
++++ b/src/freedreno/vulkan/tu_cmd_buffer.cc
+@@ -2129,12 +2129,22 @@
+       if (TU_DEBUG(NO_CONCURRENT_UNRESOLVES))
+          unresolve_mode = CONCURRENT_UNRESOLVE_MODE_DISABLED;
+ 
++      /* RB_CCU_CNTL is a render-backend register that only the BR pipe can
++       * reach. This function runs while CP_SET_THREAD_BOTH is active, so the
++       * BV pipe would write it too. On a kernel that arms the CP AHB timeout
++       * detector (KGSL on the AYN Thor) every such write logs
++       * "CP: AHB bus error" with the register number. Confine it to BR, as
++       * the RB_DBG_ECO_CNTL write below already is.
++       */
++      tu_cond_exec_start(cs, CP_COND_REG_EXEC_0_MODE(THREAD_MODE) |
++                             CP_COND_REG_EXEC_0_BR);
+       tu_cs_emit_regs(cs, RB_CCU_CNTL(A7XX,
+          .gmem_fast_clear_disable =
+            !dev->physical_device->info->props.has_gmem_fast_clear,
+          .concurrent_resolve_mode = resolve_mode,
+          .concurrent_unresolve_mode = unresolve_mode,
+       ));
++      tu_cond_exec_end(cs);
+    }
+ 
+    for (size_t i = 0; i < ARRAY_SIZE(phys_dev->info->magic_raw); i++) {
+@@ -2164,7 +2174,17 @@
+             break;
+       }
+ 
++      /* Non-context RB registers (0x8e00-0x8eff) are BR-only on A7XX; see the
++       * RB_CCU_CNTL note above.
++       */
++      const bool rb_br_only = CHIP == A7XX && magic_reg.reg >= 0x8e00 &&
++                              magic_reg.reg <= 0x8eff;
++      if (rb_br_only)
++         tu_cond_exec_start(cs, CP_COND_REG_EXEC_0_MODE(THREAD_MODE) |
++                                CP_COND_REG_EXEC_0_BR);
+       tu_cs_emit_write_reg(cs, magic_reg.reg, value);
++      if (rb_br_only)
++         tu_cond_exec_end(cs);
+    }
+ 
+    if (dev->physical_device->info->props.has_attachment_shading_rate) {

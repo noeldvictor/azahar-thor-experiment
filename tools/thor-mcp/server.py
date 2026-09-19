@@ -245,6 +245,7 @@ def state() -> dict:
         "gpu_clock_mhz": _sh(f"cat {KGSL}/clock_mhz").strip(),
         "gpu_busy_percent": round(_gpubusy_percent(busy), 1),
         "vulkan_driver": driver[-1] if driver else None,
+        "wakefulness": _wakefulness(),
         "displays": _display_ids(),
     }
 
@@ -404,12 +405,33 @@ def game_settings_delete(title_id: str) -> str:
 # Tools: launch, input, capture
 # ----------------------------------------------------------------------------
 
+def _wakefulness() -> str:
+    m = re.search(r"mWakefulness=(\w+)", _sh("dumpsys power"))
+    return m.group(1) if m else "unknown"
+
+
+def _wake() -> dict:
+    """Wake the panels and dismiss the keyguard. On a sleeping device the activity starts in the
+    stopped state: black panels, no surface, no emulation thread."""
+    before = _wakefulness()
+    if before != "Awake":
+        _sh("input keyevent KEYCODE_WAKEUP")
+        for _ in range(10):
+            if _wakefulness() == "Awake":
+                break
+            _sh("sleep 0.5", timeout=10)
+    if "isKeyguardShowing=true" in _sh("dumpsys window"):
+        _sh("wm dismiss-keyguard")
+    return {"before": before, "after": _wakefulness()}
+
+
 @mcp.tool()
 def launch(rom_path: str = "", content_uri: str = "", wait_seconds: int = 0) -> dict:
     """Launch a game. rom_path is relative to THOR_ROM_TREE, for example
     'zcci/Medabots9-KWG-1007 [0004000000174F00] [UNK].zcci'. The URI must use the tree form
     the app holds a persisted grant for; a plain document URI crashes the app with a
-    SecurityException. content_uri overrides rom_path. Returns the pid after wait_seconds."""
+    SecurityException. content_uri overrides rom_path. Wakes the panels first. Returns the pid
+    after wait_seconds."""
     if not content_uri:
         if not rom_path:
             raise ValueError("Pass rom_path or content_uri")
@@ -417,6 +439,7 @@ def launch(rom_path: str = "", content_uri: str = "", wait_seconds: int = 0) -> 
         tree = urllib.parse.quote(f"{volume}:{tree_path}", safe="")
         document = urllib.parse.quote(f"{volume}:{tree_path}/{rom_path}", safe="")
         content_uri = f"content://{DOCS_AUTHORITY}/tree/{tree}/document/{document}"
+    woke = _wake()
     out = _sh(
         f"am start -W -a android.intent.action.VIEW -d '{content_uri}' "
         f"-t application/octet-stream -n {PACKAGE}/{ACTIVITY}",
@@ -424,7 +447,12 @@ def launch(rom_path: str = "", content_uri: str = "", wait_seconds: int = 0) -> 
     )
     if wait_seconds:
         _sh(f"sleep {wait_seconds}", timeout=wait_seconds + 30)
-    return {"uri": content_uri, "am_start": out.strip().splitlines()[-2:], "pid": _pid()}
+    return {
+        "uri": content_uri,
+        "wake": woke,
+        "am_start": out.strip().splitlines()[-2:],
+        "pid": _pid(),
+    }
 
 
 @mcp.tool()

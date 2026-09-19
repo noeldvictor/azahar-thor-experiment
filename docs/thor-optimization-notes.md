@@ -9328,3 +9328,25 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   the render manager submitted and ended the pass every 20 draws. Limiting it to Mali gave
   91.7% and 93.0% GPU at the menu against 91.1% for the shipped build, same frame rate. No
   matched improvement; reverted. The 3D scene was not measured with it.
+- Turnip fault, resolved (2026-09-18, 20:40 to 23:10). Kernel source
+  (`qualcomm-linux/kgsl`, `adreno_gen7.c`): the line comes from `gen7_err_callback` for
+  `GEN7_INT_AHBERROR`; `gen7_enable_ahb_timeout_detection` arms it from the device tree NOC
+  timeout, which most phones leave at zero. Mesa main and 26.2.2: RB_CCU_CNTL (0x8e07) is
+  written once per command buffer in `tu6_init_static_regs`, which `tu6_init_hw` runs under
+  `CP_SET_THREAD_BOTH`. The R8 binary keeps symbols; the packet header 0x408e0701 is built at
+  `tu6_init_static_regs<chip 7>+0xb0`. Replacing it with a CP_NOP header (0x70100001) and
+  reinstalling: the fault moved to `CP_RL_ERROR_DETAILS_0:0x10008e79`, the next RB register in
+  the a740 raw magic table (both runs: DETAILS_1 0x12144). Mesa 26.2.2 built in WSL Ubuntu
+  (meson 1.10.1, NDK r27c, `-Wno-c++11-narrowing`, no LTO) with the BR conditional around both
+  writes: E.X. Troopers launch at 21:23, 45 minutes to the title screen, zero new fault lines
+  (`gpu_faults` last burst stays at 20:57:04, the CP_NOP run). Bundled APK SHA-256
+  `4d108e98e1732c190cdd71d99b6d4f416ba56262d1243fa8ff7bb2dde76e95b6` installed at 23:09;
+  first start logged `[BundledGpuDriver] Turnip Thor 26.2.2 r1 installed=true`, intro at 30 FPS,
+  7.5% GPU, no fault.
+- Freeze in the same run at 21:30:12: 4185 `dequeueBuffer timed out: Function not implemented
+  (-38)` lines in 1.3 seconds, then silence; afterwards all threads at 0%, GPU 0 to 3%, the
+  SurfaceFlinger frame stats frozen at the same 127 frames for seven minutes, the title screen
+  still on the panel. The system driver showed the same freeze on 2026-09-18 afternoon with
+  zero fault lines. The cause is in `PresentWindow::RecreateSwapchain` (see AGENTS.md).
+- Web search (2026-09-18): no report of this fault in the K11MCH1, Banners, or MrPurple Turnip
+  repositories, and no Mesa issue names RB_CCU_CNTL with an AHB error.

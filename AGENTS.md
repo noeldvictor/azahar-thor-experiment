@@ -1680,3 +1680,21 @@
   from the game's render-to-texture and display-transfer pattern. The pass-level merges are
   done; the next step needs that pattern understood from a per-draw log of targets and
   samplers, not another pass-level heuristic.
+- Thor GPU fault, cause and fix (2026-09-18 night). The `CP: AHB bus error` lines are Turnip
+  writes to render-backend registers from the BV pipe. `tu6_init_static_regs` runs under
+  `CP_SET_THREAD_BOTH`; upstream confines RB_DBG_ECO_CNTL, RB_RBP_CNTL, and RB_UNKNOWN_8E09 to
+  BR with a THREAD_MODE conditional but not RB_CCU_CNTL (0x8e07) and not the RB entries of the
+  a740 raw magic table (0x8e79). The Thor kernel arms the CP AHB timeout detector, so every
+  such write logs. Evidence: a binary patch that turned the 0x8e07 packet into CP_NOP moved
+  the fault to 0x8e79. Fix: `tools/turnip/patches/0001-*.patch` on Mesa 26.2.2 wraps both in
+  the same conditional. The driver is built by `tools/turnip/build.sh` in WSL, packaged by
+  `tools/turnip/package.py`, and shipped in the APK under `assets/gpu_drivers/`.
+  `BundledGpuDriver` copies it into `gpu_drivers/` and selects it once per bundled version at
+  the first start; a later manual driver choice is kept. Result: E.X. Troopers ran 45 minutes
+  on Turnip with zero new fault lines. The fault is closed; `gpu_faults` stays as a guard.
+- The E.X. Troopers freeze is not the GPU fault. It is a present-path wait cycle: after
+  `swapchain.MarkForRecreation()` or an out-of-date result on an unchanged window,
+  `RecreateSwapchain` on Android waits for a surface that never comes, the worker's acquires
+  then hit the compositor's dequeued-buffer limit (`dequeueBuffer timed out: Function not
+  implemented (-38)`, about 4000 lines in one second), and every thread ends idle. See the
+  next entry for the fix.

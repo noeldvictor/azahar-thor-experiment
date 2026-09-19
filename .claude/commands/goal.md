@@ -49,11 +49,11 @@ description: Run the two-title performance goal on the AYN Thor. Measure the nat
   area changes. The full-render-area and depth-retention changes are on and measured: GPU
   busy 99.9% to 91.5% at a steady 60 FPS on the save-slot screen (system driver). The color
   target switches remain the next target.
-- Driver: Turnip faults on this unit (see AGENTS.md); the system Qualcomm driver is the bench.
-  On it the engine scene holds 51 FPS at 99.9% GPU at 2x; Turnip held 60 FPS at 62.6% there.
-- Blocker (2026-09-18 afternoon): every Vulkan launch faults the GPU one to three seconds in,
-  on the control build too, after a warm reboot too. Use `gpu_faults` before and after every
-  Vulkan run. Next test: full power-off of the handheld. See AGENTS.md.
+- Driver: the APK bundles a patched Turnip (`tools/turnip/`) that does not fault on this unit;
+  it is the bench from 2026-09-18 night. The system Qualcomm driver held 51 FPS at 99.9% GPU
+  in the engine scene at 2x; Turnip R8 held 60 FPS at 62.6% there. Keep `gpu_faults` before
+  and after every Vulkan run as a guard.
+- Open: the E.X. Troopers present-path freeze (AGENTS.md, 2026-09-18 night).
 
 ## Procedure
 

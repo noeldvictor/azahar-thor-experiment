@@ -209,3 +209,12 @@ Azahar, PabloMK7's Citra fork, Lime3DS, Citra, and many emulator contributors di
 work.
 
 This repository remains under the upstream license terms. See [license.txt](license.txt).
+
+## GPU driver
+
+The APK ships its own Turnip build under `assets/gpu_drivers/`. It is Mesa 26.2.2 with one patch
+(`tools/turnip/patches/`) that keeps two render-backend register writes on the render pipe. On
+the AYN Thor the unpatched driver logs a CP AHB bus error on every command buffer. The app
+installs the bundled driver at the first start after an install or an update, and it keeps a
+later manual driver choice. `tools/turnip/build.sh` rebuilds the package in WSL. Details are in
+AGENTS.md.

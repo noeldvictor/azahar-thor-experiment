@@ -55,6 +55,7 @@ object DirectoryInitialization {
                     installBundledCheats()
                     installBundledGameSettings()
                     GpuDriverHelper.initializeDriverParameters()
+                    BundledGpuDriver.installIfNeeded(context)
                     DirectoryInitializationState.CITRA_DIRECTORIES_INITIALIZED
                 } else {
                     DirectoryInitializationState.CANT_FIND_EXTERNAL_STORAGE

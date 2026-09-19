@@ -16,6 +16,9 @@ It does not repeat the ledger.
   procedure. Run it with `/goal`.
 - [tools/thor-mcp/server.py](tools/thor-mcp/server.py): the MCP server that controls the Thor.
   See "Device control" below.
+- [tools/turnip/](tools/turnip/): the bundled Turnip driver. `build.sh` builds Mesa with the
+  patches in `patches/` in WSL Ubuntu and packages the zip that lives under
+  `src/android/app/src/main/assets/gpu_drivers/`. Rebuild it when a patch changes.
 
 When behavior changes, update the rule in AGENTS.md and the evidence in the notes. Do not copy
 engineering detail into README.md or this file. Link to AGENTS.md instead.
@@ -51,7 +54,9 @@ of a raw `adb` command when a tool exists.
 - `config_read`, `config_set`, `game_settings_read`, `game_settings_set`, and
   `game_settings_delete` edit the ini files in the user directory. `config_set` refuses to write
   while the app runs, and it keeps a backup.
-- `launch` starts a title from the granted ROM tree. `stop` force-stops the app.
+- `launch` starts a title from the granted ROM tree. It wakes the panels first: on a sleeping
+  device the activity starts stopped, with black panels and no emulation thread. `state`
+  reports `wakefulness`. `stop` force-stops the app.
 - `press` sends a held button press. The guest reads input once per frame, so a plain tap is
   missed.
 - `screenshot`, `fps`, `gpu`, `threads`, and `emulation_thread_time` measure a running scene.
