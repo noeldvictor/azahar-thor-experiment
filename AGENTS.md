@@ -1837,3 +1837,18 @@
   `IndexOutOfBoundsException` and killed the app the moment the menu opened. Both places now
   skip a slot that has no entry. The out-of-range files came from automation writing to slots 11
   and above; `emu_command` now refuses a slot outside 0 to 10 so it cannot happen again.
+- The per-pixel cost is the fragment shaders, measured (2026-09-19, snow field, disk shader
+  cache off so every shader compiles fresh, `IR3_SHADER_DEBUG=fs`). Eighteen fragment shaders
+  compile for that scene: median 235 instructions, mean 217, max 284, and fourteen of the
+  eighteen are over 200. One 242 instruction shader breaks down as 178 plain ALU, 34
+  multiply-add, 13 texture samples, 4 transcendental. So roughly 180 arithmetic operations per
+  pixel stand in for a fixed function 8 bit combiner, and every shader reports `0 half`: not one
+  operation runs at 16 bits. This is the whole of the shortfall at 3x and 4x, because GPU time
+  is linear in pixels and the CPU side barely moves.
+- Relaxed precision decorations, rejected (2026-09-19). Decorating the combiner arithmetic and
+  the Byteround quantisation with `RelaxedPrecision` in the SPIR-V generator did not produce a
+  single half register, with the SPIR-V optimizer on or off, and made the shaders larger:
+  median 235 to 272, max 284 to 359, and `max_waves` fell from 12 to 10 on one shader. Turnip
+  does not lower RelaxedPrecision to 16 bit for Vulkan. Getting 16 bit arithmetic needs explicit
+  `OpTypeFloat 16` values in the generator behind `VK_KHR_shader_float16_int8`, which is a much
+  larger change to `spv_fs_shader_gen.cpp`. Do not retry the decoration approach.

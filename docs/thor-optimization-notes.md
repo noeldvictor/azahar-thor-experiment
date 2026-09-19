@@ -9475,3 +9475,12 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   twenty times what a simple textured fill would cost per pixel. Either the generated fragment
   shaders are far more expensive than the PICA work they replace, or something per draw scales
   with area. Measuring the shaders is the next step and nothing else should be attempted first.
+- Fragment shader census (2026-09-19, snow field save state 5, 2x, disk shader cache off).
+  Instruction counts: 0 shaders at 50 or fewer, 3 between 51 and 100, 1 between 101 and 200,
+  14 above 200. Min 83, median 235, mean 217, max 284. Per shader detail from one 242
+  instruction program: `178 cat2, 34 cat3, 13 cat5, 4 cat4`, `0 half, 8 full, 40 constlen`,
+  `12 max_waves`, `41 systall`. Another: `234 instr`, `0 half, 6 full`, `16 max_waves`.
+- Relaxed precision trial on the same scene, rejected. With decorations on the combiner and the
+  quantisation: 15 shaders, median 272, mean 239, max 359, still `0 half`, `max_waves` 10 to 16.
+  With `disable_spirv_optimizer = true` as well: 14 shaders, median 270, mean 221, max 359,
+  still `0 half`. The decoration never reaches the hardware as 16 bit arithmetic on this driver.
