@@ -9416,3 +9416,12 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   three held 100% speed, so this scene is not the constraint; the snow field is.
 - Save states are tied to the emulator build that wrote them. After a rebuild the app shows
   "Savestate version mismatch" and the MCP run must tap Continue, or record a fresh state.
+- Turnip render mode trial (2026-09-19, E.X. Troopers engine scene, 2x, save state 4, build
+  6670a5097, five samples each): default `speed 75.6% fps 44.9 frame 22.14ms cmd 5.57 swap
+  11.61 gpu 99.9%@680`; `TU_DEBUG=sysmem` `96.1% 57.3 17.38ms 6.27 5.96 99.9%@680`;
+  `TU_DEBUG=gmem` `75.2% 45.2 22.17ms`; `TU_DEBUG=noconcurrentresolves` `75.4% 44.8 22.11ms`.
+  With the direct path and a 200 limit the same scene reached 99.1% and 59.3 FPS.
+  Resolution sweep with the direct path: 2x 96.2%, 3x 47.4% (frame 35.27 ms, swap 23.27),
+  4x 26.4% (frame 64.33 ms, swap 51.31). Default at 3x for comparison: 43.5%.
+  `TU_DEBUG=nolrz` with the direct path: 96.1%, unchanged, so low-resolution Z is not helping
+  this workload either way.

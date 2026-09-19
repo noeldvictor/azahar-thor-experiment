@@ -1766,3 +1766,23 @@
 - Open, and the next step if this is taken further: per-pass GPU timestamps. The counters and
   the trace name the structure but not which passes spend the time. Do not change the render
   path again without that; two hypotheses were already disproved by measurement today.
+- Turnip render mode, accepted (2026-09-19). Turnip chooses tiled rendering or rendering
+  straight to memory for each render pass. A 3DS frame is about ninety passes over small
+  targets, and the chooser picks tiled rendering, paying a binning and tile cost those targets
+  never earn back. `GpuDriverHelper` now sets `TU_DEBUG=sysmem` when the active driver reports
+  vendor Mesa, and a `TU_DEBUG` line in `thor_driver_env.txt` still overrides it. Measured on
+  the E.X. Troopers engine scene at 2x from one save state, same build, same session: default
+  75.6% speed and 44.9 FPS with 11.6 ms waiting in swap, forced direct path 96.1% and 57.3 FPS
+  with 6.0 ms. Forcing tiled rendering (`gmem`) gave 75.2% and `noconcurrentresolves` 75.4%, so
+  the chooser is picking tiled rendering by itself. The setting reaches Mesa drivers only; the
+  system Qualcomm driver ignores it.
+- Resolution scaling with that setting, same scene and state: 2x 96.2%, 3x 47.4%, 4x 26.4%. GPU
+  time is linear in pixels, about 17 ms per frame at 2x, so 3x and 4x need the per-pixel cost
+  cut, not another pass-level trick. Two compression theories were checked against the Mesa
+  source and rejected: this GPU sets `supports_uav_ubwc`, so the speculative storage usage on
+  RGBA8 surfaces does not disable compression, and the format list we pass is compression
+  compatible. Disabling low-resolution Z changed nothing, so it is already not helping.
+- A save state records the emulator build. After a rebuild the app asks before loading one, and
+  a run that does not answer measures the title screen instead of the scene. `emu_command
+  load_state` now answers that dialog itself. Always confirm the scene with a screenshot before
+  trusting a number.

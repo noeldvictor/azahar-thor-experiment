@@ -104,23 +104,52 @@ object GpuDriverHelper {
      * the process environment before the driver loads, for example TU_DEBUG=nobin. The Turnip
      * driver reads them when the Vulkan instance is created. No file means no change.
      */
+    /**
+     * Turnip chooses between tiled rendering and rendering straight to memory for each render
+     * pass. A 3DS frame is about ninety passes over small targets, and the chooser picks tiled
+     * rendering for them, which pays a binning and tile cost that the small targets never earn
+     * back. Forcing the direct path took the E.X. Troopers engine scene from 75.6 to 96.1
+     * percent speed at 2x on the AYN Thor. The setting applies to Mesa drivers only; the
+     * system driver ignores it. A `TU_DEBUG` line in thor_driver_env.txt overrides it.
+     */
+    private const val DEFAULT_MESA_DEBUG = "sysmem"
+
     private fun applyDriverEnvironment() {
+        val assignments = linkedMapOf<String, String>()
+        if (customDriverData.vendor == "Mesa") {
+            assignments["TU_DEBUG"] = DEFAULT_MESA_DEBUG
+        }
         try {
-            val userPath = DirectoryInitialization.userPath ?: return
-            val root = DocumentFile.fromTreeUri(CitraApplication.appContext, Uri.parse(userPath))
-                ?: return
-            val file = root.findFile("thor_driver_env.txt") ?: return
-            val text = CitraApplication.appContext.contentResolver.openInputStream(file.uri)
-                ?.use { String(it.readBytes()) } ?: return
-            text.lines().map(String::trim).filter { it.contains('=') && !it.startsWith("#") }
-                .forEach { line ->
-                    val key = line.substringBefore('=').trim()
-                    val value = line.substringAfter('=').trim()
+            val userPath = DirectoryInitialization.userPath
+            val root = userPath?.let {
+                DocumentFile.fromTreeUri(CitraApplication.appContext, Uri.parse(it))
+            }
+            val file = root?.findFile("thor_driver_env.txt")
+            val text = file?.let {
+                CitraApplication.appContext.contentResolver.openInputStream(it.uri)
+                    ?.use { stream -> String(stream.readBytes()) }
+            }
+            text?.lines()?.map(String::trim)
+                ?.filter { it.contains('=') && !it.startsWith("#") }
+                ?.forEach { line ->
+                    assignments[line.substringBefore('=').trim()] =
+                        line.substringAfter('=').trim()
+                }
+        } catch (e: Exception) {
+            Log.error("[GpuDriverHelper] Driver environment file: ${e.message}")
+        }
+        assignments.forEach { (key, value) ->
+            try {
+                if (value.isEmpty()) {
+                    android.system.Os.unsetenv(key)
+                    Log.info("[GpuDriverHelper] Driver environment: $key cleared")
+                } else {
                     android.system.Os.setenv(key, value, true)
                     Log.info("[GpuDriverHelper] Driver environment: $key=$value")
                 }
-        } catch (e: Exception) {
-            Log.error("[GpuDriverHelper] Driver environment: ${e.message}")
+            } catch (e: Exception) {
+                Log.error("[GpuDriverHelper] Driver environment $key: ${e.message}")
+            }
         }
     }
 

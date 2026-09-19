@@ -608,6 +608,28 @@ def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25
     return text
 
 
+def _dismiss_savestate_dialog() -> bool:
+    """A save state records the emulator build that wrote it. After a rebuild the app asks
+    whether to load it anyway. Answer once so an experiment is not left sitting on a dialog."""
+    _sh("sleep 1.5", timeout=10)
+    for _ in range(3):
+        try:
+            nodes = ui_dump(display=0, max_nodes=60)
+        except Exception:
+            return False
+        labels = {str(node.get("text", "")).strip() for node in nodes}
+        if "Continue" in labels and any("avestate" in label for label in labels):
+            try:
+                ui_tap("Continue")
+                return True
+            except Exception:
+                return False
+        if "Continue" not in labels:
+            return False
+        _sh("sleep 0.5", timeout=10)
+    return False
+
+
 @mcp.tool()
 def emu_command(command: str = "perf", argument: str = "", wait_seconds: int = 4) -> str:
     """Send one command to the running game and return the JSON result.
@@ -642,6 +664,8 @@ def emu_command(command: str = "perf", argument: str = "", wait_seconds: int = 4
             # The app echoes the request id, so a result left over from an earlier command is
             # never mistaken for this one.
             if parsed.get("id") == request_id:
+                if command == "load_state" and parsed.get("loaded"):
+                    _dismiss_savestate_dialog()
                 return text
         _sh("sleep 0.5", timeout=10)
     raise RuntimeError(
