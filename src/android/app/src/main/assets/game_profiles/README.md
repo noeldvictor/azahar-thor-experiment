@@ -22,9 +22,17 @@ Recognised sections and keys are the same names used by `config.ini`, plus:
 Target hardware is AYN Thor Base/Pro/Max: Snapdragon 8 Gen 2 and Adreno 740. Do not use Thor Lite /
 Snapdragon 865 behavior as the default profile target unless it is explicitly documented.
 
+This directory is the per-title settings database. When a measurement finds the setting a title
+wants, put it in that title's file here with the scene and the numbers that justify it, so every
+user gets it without having to discover it. A user can still change any of it in **Game
+Settings**, and their file is never overwritten by an update.
+
 Keep `docs/thor-optimization-notes.md` and `AGENTS.md` current when a bundled profile changes.
 
 - `0004000000053700.ini` - E.X. Troopers: 2x resolution, custom textures off, normal frame limit,
-  and the texture-copy fallback skip enabled for smoother Thor play.
+  and the texture-copy fallback skip enabled for smoother Thor play. Validated on 2026-09-19 in
+  the snow field, the heaviest scene found: 2x holds 95 to 97% speed; 3x reaches about 51% and
+  4x about 26%, both limited by the GPU. Keep this profile at 2x until the render path gets
+  cheaper.
 - `0004000000112C00.ini` - Conception II: 5x resolution so both Thor panels downscale instead of
   stretching, Anime4K texture filter off, Snapdragon GSR screen filter.

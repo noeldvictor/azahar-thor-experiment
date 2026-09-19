@@ -219,6 +219,19 @@ installs the bundled driver at the first start after an install or an update, an
 later manual driver choice. `tools/turnip/build.sh` rebuilds the package in WSL. Details are in
 AGENTS.md.
 
+The fork also tells that driver to render straight to memory rather than tile every render pass.
+A 3DS frame is about ninety passes over small targets, and tiling them costs more than it saves.
+In the heaviest E.X. Troopers scene this moved 2x from 75.6% to about 96% of full speed. Put a
+`TU_DEBUG` line in `thor_driver_env.txt` in the user directory to override it.
+
+## Per-title settings
+
+Each game can carry its own settings. The fork ships a profile for a title under
+`assets/game_profiles`, the app installs it on first run, and it never overwrites settings you
+already changed. To see or change them, long-press a game and open **Game Settings**; only the
+values you change are stored for that game. E.X. Troopers ships at 2x, which holds full speed in
+its heaviest scene on the Thor.
+
 Measured on 2026-09-18 in the E.X. Troopers engine scene at 2x and 100% speed: 59.4 FPS with
 the GPU 64 to 83% busy on the bundled driver, against 51 FPS at 99.9% on the system Qualcomm
 driver.

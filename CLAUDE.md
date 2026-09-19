@@ -88,6 +88,18 @@ The tools depend on these facts: package `org.azahar_emu.azahar.debug`, user dir
 `/storage/emulated/0/Azaharuser`, ROM tree `2664-21DE:Roms/n3ds`, USB serial `c3ca0370`. Change
 them in `.mcp.json` when the device changes.
 
+## Per-title settings
+
+`src/android/app/src/main/assets/game_profiles/<title id>.ini` is the per-title settings
+database. The app copies each file into `GameSettings/` on first run and never overwrites a file
+the user already has, and native code overlays it over `config.ini` at launch for that session.
+Overlays are sparse: only the keys in the file change. A user edits the same values in the app by
+long-pressing a game and opening **Game Settings**.
+
+When a measurement finds the setting a title wants, record it in that title's file with the scene
+and the numbers behind it, and note it in the notes. That is how a finding reaches users instead
+of staying in a log.
+
 ## Performance expectation on the Thor
 
 The 3DS GPU is a 268 MHz PICA200 that draws 400x240 and 320x240 frames. The Thor's Adreno 740
