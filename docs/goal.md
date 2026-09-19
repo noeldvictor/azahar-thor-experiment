@@ -1,6 +1,18 @@
----
-description: Get E.X. Troopers to 60 FPS from 2x to 4x resolutions on the AYN Thor, and to 120 FPS at 2x in fast forward. Find and remove the emulator and driver cost that stands in the way. Medarot 9 stays as the second title and keeps its frame-rate patch work.
----
+# Performance goal: E.X. Troopers on the AYN Thor
+
+This is a document, not a slash command. `/goal` is Claude Code's built-in command: it takes a
+completion condition and keeps working until an evaluator model judges the condition met. Point
+it at this file, for example:
+
+```
+/goal Read docs/goal.md and follow it. Done when E.X. Troopers holds Speed 100% at 60 FPS in
+the snow field from save state 5 at 2x, 3x and 4x, and reaches 200% speed at 2x with the frame
+limit at 200, each measured with the thor MCP perf_stats tool and each confirmed by a
+screenshot of the snow scene. Or stop after 40 turns.
+```
+
+The evaluator reads the conversation rather than running commands itself, so every claim has to
+appear in the transcript: the numbers from `perf_stats` and the screenshot that proves the scene.
 
 # Goal: E.X. Troopers at 60 FPS from 2x to 4x resolutions, and 120 FPS at 2x in fast forward
 
@@ -61,6 +73,8 @@ Once a cost is found, the fix should use the hardware the Thor already has:
   tool in `azahar/CLAUDE.md`.
 - Snapshot this goal into `docs/goal_history/<date>_goal<n>.md` whenever the target changes, so
   the goals we have set and what they produced can be read back later.
+- Keep the condition given to `/goal` short and checkable from the transcript. The evaluator
+  cannot run commands; it only reads what this session has already shown.
 
 ## Titles
 

@@ -12,8 +12,10 @@ It does not repeat the ledger.
 - [docs/thor-cheat-gaps.md](docs/thor-cheat-gaps.md): cheat coverage gaps.
 - [README.md](README.md): public description of the fork.
 - [AI-POLICY.md](AI-POLICY.md): how AI assistance is used here.
-- [.claude/commands/goal.md](.claude/commands/goal.md): the current performance goal and its
-  procedure. Run it with `/goal`.
+- [docs/goal.md](docs/goal.md): the current performance goal, its premise and its procedure.
+  `/goal` is Claude Code's built-in command, not ours: give it a completion condition that
+  points at this file. Do not add a `goal` command under `.claude/commands/`; it would shadow
+  the built-in.
 - [docs/goal_history/](docs/goal_history/): a dated snapshot of each goal we have set, so the
   goals and what they produced can be read back. Add one whenever the goal changes.
 - [tools/thor-mcp/server.py](tools/thor-mcp/server.py): the MCP server that controls the Thor.
