@@ -147,6 +147,7 @@ foreach(KEY IN ITEMS
     "udp_input_port"
     "udp_pad_index"
     "record_frame_times"
+    "allow_savestate_mismatch"
     "language" # FIXME: DUPLICATE KEY (libretro equivalent: language_value)
     "web_api_url"
     "network_token"

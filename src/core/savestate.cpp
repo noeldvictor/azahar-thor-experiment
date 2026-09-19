@@ -9,6 +9,7 @@
 #include "common/archives.h"
 #include "common/file_util.h"
 #include "common/logging/log.h"
+#include "common/settings.h"
 #include "common/scm_rev.h"
 #include "common/swap.h"
 #include "common/zstd_compression.h"
@@ -299,10 +300,17 @@ bool System::LoadStateBuffer(std::vector<u8> buffer) {
     }
     std::string revision = fmt::format("{:02x}", fmt::join(header.revision, ""));
     if (revision != Common::g_scm_rev) {
-        LOG_ERROR(Core,
-                  "Save state file created from a different revision (core: {}, savestate: {})",
-                  Common::g_scm_rev, revision);
-        return false;
+        if (!Settings::values.allow_savestate_mismatch.GetValue()) {
+            LOG_ERROR(Core,
+                      "Save state file created from a different revision (core: {}, savestate: {})",
+                      Common::g_scm_rev, revision);
+            return false;
+        }
+        LOG_WARNING(Core,
+                    "Loading a save state from a different revision (core: {}, savestate: {}) "
+                    "because allow_savestate_mismatch is set. Expect a crash if the state format "
+                    "changed between the two builds.",
+                    Common::g_scm_rev, revision);
     }
 
     std::vector<u8> state(buffer.begin() + sizeof(CSTHeader), buffer.end());

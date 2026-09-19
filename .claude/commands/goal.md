@@ -11,8 +11,11 @@ description: Get E.X. Troopers to 60 FPS from 2x to 4x resolutions on the AYN Th
 2. With fast forward, the same scenes reach **200% speed**, which is 120 game frames per second.
    The panels are pinned at 60 Hz, so this shows on screen as 60 FPS with the game running at
    double rate. Fast forward is game speed, not frame rate.
-3. The heaviest scene decides the result. The snow field is the reference; a menu or a video
-   proves nothing.
+3. **Every measurement for this goal is taken in the snow field, and nowhere else.** It is the
+   heaviest scene in the game and the one the target is judged on. A menu, a title screen, a
+   cutscene or a video proves nothing: they run at a fraction of the load and have repeatedly
+   produced readings that looked like progress and were not. Confirm the scene with a
+   screenshot before recording any number, and say which scene every recorded number came from.
 
 ## The premise, which is not negotiable
 
@@ -43,8 +46,13 @@ Once a cost is found, the fix should use the hardware the Thor already has:
 
 ## How to work on it
 
-- Measure before changing anything, and confirm the scene with a screenshot. Three plausible
-  theories died against measurement on 2026-09-19 alone.
+- Measure before changing anything, in the snow field, and confirm the scene with a screenshot.
+  Three plausible theories died against measurement on 2026-09-19 alone, and several readings
+  were void because the automated run had drifted into a video without noticing.
+- Reaching the snow field takes about six minutes of play from launch, so keep a save state of
+  it. `allow_savestate_mismatch` in the Renderer settings lets a state written by one build load
+  into another, which is what makes a before and after comparison possible across a rebuild. It
+  is off by default and is for testing only.
 - Research is in scope: upstream Azahar, other forks, Mesa and Turnip issues and merge requests.
   We build our own Turnip (`tools/turnip/`), so a driver fix is ours to make and ship.
 - Move work onto hardware that is sitting idle: the GPU, NEON on the CPU, and anything else the

@@ -638,6 +638,12 @@ struct Values {
     SwitchableSetting<std::string> anaglyph_shader_name{"Dubois (builtin)",
                                                         Keys::anaglyph_shader_name};
 
+    /// Loads a save state written by a different build of the emulator. A save state records
+    /// the build that wrote it because a format change between builds would deserialise into
+    /// nonsense. This exists so a performance change can be measured against the same scene
+    /// before and after a rebuild. It is off by default and belongs to testing, not to players.
+    Setting<bool> allow_savestate_mismatch{false, Keys::allow_savestate_mismatch};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};
