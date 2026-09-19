@@ -218,3 +218,12 @@ the AYN Thor the unpatched driver logs a CP AHB bus error on every command buffe
 installs the bundled driver at the first start after an install or an update, and it keeps a
 later manual driver choice. `tools/turnip/build.sh` rebuilds the package in WSL. Details are in
 AGENTS.md.
+
+Measured on 2026-09-18 in the E.X. Troopers engine scene at 2x and 100% speed: 59.4 FPS with
+the GPU 64 to 83% busy on the bundled driver, against 51 FPS at 99.9% on the system Qualcomm
+driver.
+
+The same night fixed the E.X. Troopers freeze. It was not the driver. After a stalled swapchain
+acquire the Android present path waited for a new surface that never comes. The swapchain is now
+rebuilt on the current surface, and a stale frame is dropped instead of presented. A stall now
+costs about one second instead of a frozen picture.
