@@ -117,6 +117,27 @@ and read the guest FPS, the speed, the GPU busy percent, and the emulation threa
 panels are pinned at 60 Hz, so the screen shows at most 60 frames per second; fast forward is
 game speed, not frame rate.
 
+## Open work
+
+- HD texture mode, not yet evaluated. The pieces exist: `custom_textures`, `preload_textures`,
+  `dump_textures`, and `async_custom_loading` in the Utility settings, with
+  `CustomTexManager` reading `load/textures/<title id>/` and writing
+  `dump/textures/<title id>/`. What is missing is a measurement on the Thor of what a pack
+  costs in memory, load time, and frame rate at 2x, and whether preloading or streaming is
+  right for this device. Decide that before recommending the mode to users.
+- HD texture paths should sit on internal storage. Dumping and loading through the granted
+  user directory goes over the storage access framework for every file, which is slow for the
+  thousands of small files a pack contains. Measure internal storage against the user
+  directory before choosing.
+- A hotkey that reloads custom textures during play. The hotkeys are an enum in
+  `features/hotkeys/Hotkey.kt` with the next free id after `TOP_SCREEN_STRETCH(10010)`, plus a
+  case in `HotkeyUtility`. Reloading in place lets a pack be iterated on without restarting the
+  game, which is what makes authoring a pack practical.
+- An endpoint and a shape for texture packs, so a pack can be fetched and installed rather than
+  copied by hand. Define the manifest first: title id, pack name, version, hash per file, and
+  the texture naming scheme `CustomTexManager` already expects. Keep the shape stable before
+  anything downloads from it, and never install a pack the user did not ask for.
+
 ## Finishing a task
 
 Cleanup is part of finishing. Before you hand work back, remove the stale CMake configuration
