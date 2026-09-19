@@ -9350,3 +9350,22 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   zero fault lines. The cause is in `PresentWindow::RecreateSwapchain` (see AGENTS.md).
 - Web search (2026-09-18): no report of this fault in the K11MCH1, Banners, or MrPurple Turnip
   repositories, and no Mesa issue names RB_CCU_CNTL with an AHB error.
+- Freeze fix run (2026-09-18, 23:17 to 23:27, bundled Turnip, APK SHA-256
+  `eb9d9b71fa525c13ae023c7bc8d4c677f4b08dbb37c3c6e6e4f5c76216581224` before the retry-bound
+  change): stall warnings at 270.5 s, 274.8 s, 279.2 s, 550.4 s, and 554.7 s after launch, each
+  followed by `Swapchain rebuilt` within 30 ms; the generation number printed twice per value
+  because each panel has its own present window. Between and after the stalls: 30 FPS, the
+  emulation thread at 40% of a core, GPU 7.5%, no fault line. System log at the same times:
+  `InputManager-JNI: Viewport [0] to add` and `Viewport [1] to add` every 3.02 s, four times per
+  stall window; `pservice: cpu_init boot_completed cpugpumode=2` every 10 s all the time
+  (unrelated); the `DisplayIdentification` and `AdrenoUtils` lines are the screenshot tool.
+- Final run (2026-09-18, 23:33 to 23:41, bundled Turnip, retry bound 1000, APK SHA-256
+  `d1d4ecc52faa725ce14ceeb9545e06c9659fcb9ed4de50223edc21de206ab7ff`): twelve stall warnings
+  between 23:33:38 and 23:33:54, each followed by a rebuild within 30 ms, none afterwards.
+  Intro videos 30 FPS at 7.5% GPU. Engine scene (mech tutorial fight, capture
+  `run3-405s`), E.X. Troopers per-title 2x at 100% speed: 59.4 FPS mean, 16.85 ms P95, GPU
+  82.8% at the first sample and 63.7 to 71.7% two minutes later, emulation thread 41.7% of a
+  core, 615 MHz, zero fault lines. Same scene on the system Qualcomm driver this afternoon:
+  51.2 FPS at 99.9%. Device left with the app stopped, `svc power stayon false`, performance
+  mode 2, fan mode 4, brightness 255. WSL: 700 MB of archives removed, the 2.6 GB build tree in
+  `/root/turnip-thor` kept for rebuilds. Workspace: `tmp/mesa` (20 MB) removed.

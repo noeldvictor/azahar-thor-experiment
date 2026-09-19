@@ -38,6 +38,8 @@ struct Frame {
     u64 submit_tick{};
     bool present_valid{};
     bool direct_present{};
+    // Swapchain generation that owns present_image_index. A rebuilt swapchain invalidates it.
+    u32 present_generation{};
     // LibRetro owns its presentation command buffers and synchronization separately.
     vk::Semaphore render_ready{};
     vk::Fence present_done{};
@@ -130,6 +132,8 @@ private:
     bool blit_supported;
     bool use_present_thread{true};
     void* last_render_surface{};
+    // Incremented by every swapchain rebuild. Guarded by swapchain_mutex.
+    u32 swapchain_generation{};
 };
 
 } // namespace Vulkan

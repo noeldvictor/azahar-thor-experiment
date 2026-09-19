@@ -323,6 +323,7 @@ bool PresentWindow::TryPrepareDirectPresent(Frame* frame) {
     frame->present_image = acquired_image.image;
     frame->present_image_index = acquired_image.index;
     frame->present_ready = acquired_image.present_ready;
+    frame->present_generation = swapchain_generation;
     frame->present_valid = true;
     frame->framebuffer = direct_framebuffers[acquired_image.index];
     frame->renderpass = direct_present_renderpass;
@@ -455,8 +456,18 @@ void PresentWindow::RecreateSwapchain(Frame* frame) {
 #ifdef ANDROID
     {
         std::unique_lock lock{recreate_surface_mutex};
-        recreate_surface_cv.wait(lock, [this]() { return surface != next_surface; });
-        surface = next_surface;
+        // NotifySurfaceChanged() delivers a replacement surface only when the frontend hands
+        // over a different window. An out-of-date or stalled swapchain on a window that is
+        // still alive is rebuilt on the current surface. Waiting here for a surface that never
+        // comes left every thread idle (E.X. Troopers, 2026-09-18). Only a destroyed window
+        // waits for the next surfaceChanged().
+        const bool window_alive = emu_window.GetWindowInfo().render_surface != nullptr;
+        if (!window_alive || !surface) {
+            recreate_surface_cv.wait(lock, [this]() { return surface != next_surface; });
+        }
+        if (next_surface != surface) {
+            surface = next_surface;
+        }
     }
 #endif
     std::scoped_lock submit_lock{scheduler.submit_mutex};
@@ -468,6 +479,8 @@ void PresentWindow::RecreateSwapchain(Frame* frame) {
 #ifdef ANDROID
     CreateDirectFramebuffers();
 #endif
+    ++swapchain_generation;
+    LOG_INFO(Render_Vulkan, "Swapchain rebuilt (generation {})", swapchain_generation);
 }
 
 void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
@@ -510,16 +523,18 @@ void PresentWindow::PrepareForPresent(vk::CommandBuffer cmdbuf, Frame* frame) {
 #endif
 
     AcquiredSwapchainImage acquired_image;
-    // Acquire retries in a row. When the GPU faults, the compositor keeps every image and the
-    // acquire never succeeds. After a bound the swapchain is rebuilt instead of spinning forever.
+    // Acquire retries in a row. When the compositor keeps every image the acquire never
+    // succeeds. After a bound of about one second the swapchain is rebuilt instead of spinning
+    // forever; a normal frame waits a few milliseconds here at most.
     u32 acquire_retries = 0;
-    constexpr u32 acquire_retry_limit = 4000;
+    constexpr u32 acquire_retry_limit = 1000;
     for (;;) {
         switch (swapchain.AcquireNextImage(frame->image_acquired, acquired_image)) {
         case SwapchainAcquireResult::Success:
             frame->present_image = acquired_image.image;
             frame->present_image_index = acquired_image.index;
             frame->present_ready = acquired_image.present_ready;
+            frame->present_generation = swapchain_generation;
             frame->present_valid = true;
             break;
         case SwapchainAcquireResult::Recreate:
@@ -653,6 +668,12 @@ void PresentWindow::FinishPresent(Frame* frame) {
         if (swapchain.NeedsRecreation()) {
             RecreateSwapchain(frame);
         }
+        return;
+    }
+    if (frame->present_generation != swapchain_generation) [[unlikely]] {
+        // The image index belongs to a swapchain that was rebuilt after the acquire. Its
+        // semaphores went with it; presenting the index into the new swapchain is invalid.
+        frame->present_valid = false;
         return;
     }
     std::scoped_lock submit_lock{scheduler.submit_mutex};

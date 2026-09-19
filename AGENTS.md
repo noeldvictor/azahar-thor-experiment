@@ -1698,3 +1698,14 @@
   then hit the compositor's dequeued-buffer limit (`dequeueBuffer timed out: Function not
   implemented (-38)`, about 4000 lines in one second), and every thread ends idle. See the
   next entry for the fix.
+- Present-path freeze, fixed (2026-09-18 night). `PresentWindow::RecreateSwapchain` on Android
+  waited for a replacement surface in every case. A rebuild that the acquire-retry bound or an
+  out-of-date result requests on a window that is still alive now reuses the current surface;
+  only a destroyed window waits for the next `surfaceChanged()`. Every rebuild bumps a
+  generation counter; a frame whose image was acquired from an older generation is dropped in
+  `FinishPresent` instead of presented into the new swapchain. The retry bound is 1000 (about
+  one second). Verified on the bundled Turnip: nine minutes of E.X. Troopers with three stall
+  events, each followed by a rebuild and a running game, where the previous build froze at the
+  first one. The stalls themselves come from outside the app: the system re-adds both display
+  viewports every three seconds during each one, so the compositor holds every image for ten
+  to thirteen seconds. Their trigger is open.
