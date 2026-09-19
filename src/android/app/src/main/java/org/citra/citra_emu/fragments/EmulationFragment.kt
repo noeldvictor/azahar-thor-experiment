@@ -683,6 +683,12 @@ class EmulationFragment :
         }
 
         savestates?.forEach {
+            // The menu holds one entry per supported slot. A state file whose slot is outside
+            // that range, which an older build or an external tool can leave behind, used to
+            // index past the end and crash the menu.
+            if (it.slot < 0 || it.slot >= popupMenu.menu.size()) {
+                return@forEach
+            }
             var text: String
             if (it.slot == NativeLibrary.QUICKSAVE_SLOT) {
                 text = getString(R.string.emulation_occupied_quicksave_slot, it.time)
@@ -715,8 +721,13 @@ class EmulationFragment :
         }
 
         savestates?.forEach {
+            // Same guard as the save menu: ignore a state whose slot has no entry here.
+            val index = it.slot - 1
+            if (index < 0 || index >= popupMenu.menu.size()) {
+                return@forEach
+            }
             val text = getString(R.string.emulation_occupied_state_slot, it.slot, it.time)
-            popupMenu.menu[it.slot - 1].setTitle(text).setEnabled(true)
+            popupMenu.menu[index].setTitle(text).setEnabled(true)
         }
 
         popupMenu.show()

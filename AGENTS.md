@@ -1831,3 +1831,9 @@
 - The end-of-pass barrier is still unmeasured on a heavy scene. The run that appeared to clear
   it was on a light scene and is void; the retry could not hold the snow field long enough. Do
   not treat that barrier as ruled out.
+- Save state menu crash, fixed (2026-09-19). `EmulationFragment.showStateSubmenu` and
+  `showLoadStateSubmenu` build one menu entry per supported slot and then index that menu by the
+  slot of every state file found. A state file outside the supported range threw
+  `IndexOutOfBoundsException` and killed the app the moment the menu opened. Both places now
+  skip a slot that has no entry. The out-of-range files came from automation writing to slots 11
+  and above; `emu_command` now refuses a slot outside 0 to 10 so it cannot happen again.

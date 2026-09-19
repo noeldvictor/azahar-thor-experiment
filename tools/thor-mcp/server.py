@@ -647,6 +647,12 @@ def emu_command(command: str = "perf", argument: str = "", wait_seconds: int = 4
     allowed = {"save_state", "load_state", "states", "perf", "perf_log"}
     if command not in allowed:
         raise ValueError(f"command must be one of {sorted(allowed)}")
+    if command in {"save_state", "load_state"}:
+        # The in-game save state menu holds one entry per supported slot. A state written
+        # outside that range is invisible there and used to crash the menu.
+        slot = int(argument) if str(argument).strip().lstrip("-").isdigit() else 1
+        if not 0 <= slot <= 10:
+            raise ValueError(f"slot must be 0 to 10, got {slot}")
     if _pid() is None:
         raise RuntimeError("The app is not running. Launch a game first.")
     result_remote = f"{USER_DIR}/log/thor_command.json"
