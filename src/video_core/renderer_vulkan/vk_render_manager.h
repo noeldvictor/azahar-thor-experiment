@@ -99,6 +99,12 @@ private:
     };
     std::vector<TracedPass> pass_trace;
     std::chrono::steady_clock::time_point last_trace_log{};
+
+    /// GPU timestamps around each render pass, profiling builds only. Two timestamps per pass.
+    static constexpr u32 MaxTimedPasses = 512;
+    vk::UniqueQueryPool timestamp_pool;
+    u32 timestamp_index{};
+    bool timestamps_ready{};
 };
 
 } // namespace Vulkan

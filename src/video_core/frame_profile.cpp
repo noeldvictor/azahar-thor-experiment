@@ -99,6 +99,17 @@ void ReportFrameProfileWindow() {
                                  swaps),
              PerSwap(values, FrameProfileEvent::StreamBufferWraps, swaps));
     LOG_INFO(Render_Vulkan,
+             "ThorFrameProfile draw_ms_per_swap sync={:.2f} framebuffer={:.2f} textures={:.2f} "
+             "shader={:.2f} lut={:.2f} uniforms={:.2f} pass={:.2f} submit={:.2f}",
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawSyncStateNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawFramebufferNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawTextureUnitsNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawShaderNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawLutNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawUniformsNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawPassNanoseconds, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::DrawSubmitNanoseconds, swaps));
+    LOG_INFO(Render_Vulkan,
              "ThorFrameProfile renderpass begin_per_swap={:.3f} reuse_per_swap={:.3f} "
              "end_per_swap={:.3f} end_image_barriers_per_swap={:.3f} mali_flushes={}",
              PerSwap(values, FrameProfileEvent::RenderPassBegins, swaps),

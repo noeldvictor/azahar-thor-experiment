@@ -741,7 +741,11 @@ void RasterizerVulkan::DrawTriangles() {
 
 bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
-    SyncDrawState();
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawSyncStateNanoseconds};
+        SyncDrawState();
+    }
 
     const bool shadow_rendering = regs.framebuffer.IsShadowRendering();
     const bool has_stencil = regs.framebuffer.HasStencil();
@@ -795,16 +799,32 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     }
 
     // Sync and bind the texture surfaces
-    SyncTextureUnits(framebuffer);
-    SyncUtilityTextures(framebuffer);
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawTextureUnitsNanoseconds};
+        SyncTextureUnits(framebuffer);
+        SyncUtilityTextures(framebuffer);
+    }
 
     // Sync and bind the shader
-    pipeline_cache.UseFragmentShader(regs, user_config);
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawShaderNanoseconds};
+        pipeline_cache.UseFragmentShader(regs, user_config);
+    }
 
     // Sync the LUTs within the texture buffer
-    SyncAndUploadLUTs();
-    SyncAndUploadLUTsLF();
-    UploadUniforms(accelerate);
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawLutNanoseconds};
+        SyncAndUploadLUTs();
+        SyncAndUploadLUTsLF();
+    }
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawUniformsNanoseconds};
+        UploadUniforms(accelerate);
+    }
 
     // Begin rendering. The render area is the whole framebuffer when that costs at most twice
     // the draw rectangle, so that viewport changes between draws reuse the open pass. The
@@ -822,7 +842,11 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                            framebuffer_rect.bottom <= draw_rect.bottom &&
                            framebuffer_rect.right >= draw_rect.right &&
                            framebuffer_rect.top >= draw_rect.top;
-    renderpass_cache.BeginRendering(framebuffer, full_area ? framebuffer_rect : draw_rect);
+{
+        VideoCore::ScopedFrameProfileTimer timer{
+            VideoCore::FrameProfileEvent::DrawPassNanoseconds};
+        renderpass_cache.BeginRendering(framebuffer, full_area ? framebuffer_rect : draw_rect);
+    }
     pass_color_addr = using_color_fb ? color_addr : 0;
     pass_depth_addr = using_depth_fb ? depth_addr : 0;
 
@@ -838,6 +862,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
 
     // Draw the vertex batch
     bool succeeded = true;
+    VideoCore::ScopedFrameProfileTimer submit_timer{
+        VideoCore::FrameProfileEvent::DrawSubmitNanoseconds};
     if (accelerate) {
         succeeded = AccelerateDrawBatchInternal(is_indexed);
     } else {

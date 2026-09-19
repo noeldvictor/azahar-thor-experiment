@@ -1786,3 +1786,21 @@
   a run that does not answer measures the title screen instead of the scene. `emu_command
   load_state` now answers that dialog itself. Always confirm the scene with a screenshot before
   trusting a number.
+- Per-pass GPU timestamps exist in profiling builds (`ThorPassTime`), and their limit is
+  recorded here so the number is not misread. Passes overlap on the GPU, so a top-of-pipe to
+  bottom-of-pipe interval around one pass includes queued work: every pass reads about the same
+  0.22 ms whatever its size, which is an artifact, not a fixed cost. Use the sum only to compare
+  like with like across a change. Attributing a share of the frame needs serialised passes.
+- The end-of-pass barrier is not the cost. Removing it entirely, which is incorrect but
+  measurable, left the summed pass time at 27.9 ms against 29.2 ms with it. Do not spend effort
+  narrowing that barrier.
+- Draw path CPU cost, measured (2026-09-19, `draw_ms_per_swap`): sync 0.07, framebuffer 0.00,
+  textures 0.36, shader 0.15, lut 0.09, uniforms 0.19, pass 0.10, submit 0.47, about 1.4 ms per
+  frame in total. The draw path is not where the emulation thread spends its time; the rest sits
+  in guest emulation.
+- Thermals bound every measurement on this device. A long session reached 82 to 92 C at the SoC
+  and the GPU dropped to 401 MHz mid-run, which made a 4x reading meaningless. Read
+  `/sys/class/thermal/thermal_zone*/temp` with any result, and discard a run whose GPU clock
+  fell below its usual 615 or 680 MHz.
+- A scene reached by pressing A blindly is usually a video, where the GPU is near idle and any
+  speed number is meaningless. Confirm the scene with a screenshot before recording a number.

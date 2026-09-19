@@ -9425,3 +9425,15 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   4x 26.4% (frame 64.33 ms, swap 51.31). Default at 3x for comparison: 43.5%.
   `TU_DEBUG=nolrz` with the direct path: 96.1%, unchanged, so low-resolution Z is not helping
   this workload either way.
+- Title screen counters at 2x (2026-09-19, after the direct render path): speed 100%, frame
+  12.01 ms, GPU 87.3% at 680 MHz, 198 render pass begins per swap, 10.7 display transfers per
+  swap totalling 3.70 Mpix against 0.69 Mpix of actual screen, 5.35 validation copies at
+  0.61 Mpix, present 3.42 Mpix, and about half the draws falling back to the software geometry
+  path. The same screen read 51% speed at 3x, which is where an earlier matrix had left the
+  per-title resolution after it threw before its restore step; the reading was corrected.
+- Goal matrix attempt (2026-09-19, production build): 2x limit 100 gave 99.8% speed, 2x limit
+  200 gave 199.1% speed and 59.6 FPS, 3x limit 100 gave 99.9%, all three in light scenes the
+  automated advance had landed in, with the GPU between 15 and 23%. The 4x run read 19.4% with
+  the GPU throttled to 401 MHz after the SoC reached 92 C. Only the 2x limit 200 result is
+  worth keeping, and only as evidence that fast forward reaches 200% where the GPU has room.
+  Redo the matrix from a verified gameplay save state on a cool device.

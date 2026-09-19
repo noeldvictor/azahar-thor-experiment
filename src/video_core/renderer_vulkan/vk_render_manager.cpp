@@ -91,7 +91,7 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
     }
 
 #if THOR_FRAME_PROFILING
-    if (pass.render_pass && pass_trace.size() < 512) {
+    if (pass.render_pass && pass_trace.size() < MaxTimedPasses) {
         pass_trace.push_back({images[0], pass.render_area.extent.width,
                               pass.render_area.extent.height, num_draws});
     }
@@ -100,6 +100,24 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
 
     EndRendering();
     VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::RenderPassBegins);
+#if THOR_FRAME_PROFILING
+    if (!timestamp_pool) {
+        const vk::QueryPoolCreateInfo pool_info = {
+            .queryType = vk::QueryType::eTimestamp,
+            .queryCount = MaxTimedPasses * 2,
+        };
+        timestamp_pool = instance.GetDevice().createQueryPoolUnique(pool_info);
+        scheduler.Record([pool = *timestamp_pool](vk::CommandBuffer cmdbuf) {
+            cmdbuf.resetQueryPool(pool, 0, MaxTimedPasses * 2);
+        });
+    }
+    if (timestamp_index < MaxTimedPasses) {
+        scheduler.Record([pool = *timestamp_pool, slot = timestamp_index](
+                             vk::CommandBuffer cmdbuf) {
+            cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, pool, slot * 2);
+        });
+    }
+#endif
     scheduler.Record([info = new_pass](vk::CommandBuffer cmdbuf) {
         const vk::RenderPassBeginInfo renderpass_begin_info = {
             .renderPass = info.render_pass,
@@ -143,6 +161,47 @@ void RenderManager::ReportPassTrace() {
     }
     LOG_INFO(Render_Vulkan, "ThorPasses passes={} targets={} draws={} seq={}", pass_trace.size(),
              targets.size(), total_draws, sequence);
+
+    // GPU time per pass. The stall is acceptable once per second in a profiling build.
+    if (timestamps_ready && timestamp_pool) {
+        const u32 timed = std::min<u32>(timestamp_index, MaxTimedPasses);
+        scheduler.Finish();
+        std::vector<u64> stamps(timed * 2, 0);
+        const vk::Result result = instance.GetDevice().getQueryPoolResults(
+            *timestamp_pool, 0, timed * 2, stamps.size() * sizeof(u64), stamps.data(),
+            sizeof(u64), vk::QueryResultFlagBits::e64);
+        if (result == vk::Result::eSuccess) {
+            const double period =
+                instance.GetPhysicalDevice().getProperties().limits.timestampPeriod;
+            double total_ms = 0.0;
+            std::vector<std::pair<double, std::size_t>> by_pass;
+            for (u32 i = 0; i < timed; i++) {
+                const double ms = (stamps[i * 2 + 1] - stamps[i * 2]) * period / 1.0e6;
+                total_ms += ms;
+                by_pass.emplace_back(ms, i);
+            }
+            std::sort(by_pass.begin(), by_pass.end(),
+                      [](const auto& a, const auto& b) { return a.first > b.first; });
+            std::string top;
+            for (std::size_t i = 0; i < by_pass.size() && i < 8; i++) {
+                const std::size_t idx = by_pass[i].second;
+                const TracedPass& entry =
+                    idx < pass_trace.size() ? pass_trace[idx] : TracedPass{};
+                top += fmt::format("{:.2f}ms({}x{},{}draws) ", by_pass[i].first, entry.width,
+                                   entry.height, entry.draws);
+            }
+            // Passes overlap on the GPU, so these intervals include queued work and must not
+            // be read as the cost of one pass. Use them to compare like with like across a
+            // change, never to attribute a share of the frame.
+            LOG_INFO(Render_Vulkan, "ThorPassTime timed={} sum_overlapping_ms={:.2f} top={}",
+                     timed, total_ms, top);
+        }
+        scheduler.Record([pool = *timestamp_pool](vk::CommandBuffer cmdbuf) {
+            cmdbuf.resetQueryPool(pool, 0, MaxTimedPasses * 2);
+        });
+    }
+    timestamp_index = 0;
+    timestamps_ready = false;
     pass_trace.clear();
 #endif
 }
@@ -153,6 +212,17 @@ void RenderManager::EndRendering() {
     }
 
     VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::RenderPassEnds);
+
+#if THOR_FRAME_PROFILING
+    if (timestamp_pool && timestamp_index < MaxTimedPasses) {
+        scheduler.Record([pool = *timestamp_pool, slot = timestamp_index](
+                             vk::CommandBuffer cmdbuf) {
+            cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, pool, slot * 2 + 1);
+        });
+        timestamp_index++;
+        timestamps_ready = true;
+    }
+#endif
 
     scheduler.Record([images = images, aspects = aspects,
                       shadow_rendering = shadow_rendering](vk::CommandBuffer cmdbuf) {
