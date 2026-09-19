@@ -6,6 +6,8 @@
 #include "video_core/frame_profile.h"
 #include "video_core/rasterizer_cache/pixel_format.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
+#include <algorithm>
+#include <string>
 #include "video_core/renderer_vulkan/vk_render_manager.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_texture_runtime.h"
@@ -88,6 +90,14 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
         return;
     }
 
+#if THOR_FRAME_PROFILING
+    if (pass.render_pass && pass_trace.size() < 512) {
+        pass_trace.push_back({images[0], pass.render_area.extent.width,
+                              pass.render_area.extent.height, num_draws});
+    }
+#endif
+    num_draws = 0;
+
     EndRendering();
     VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::RenderPassBegins);
     scheduler.Record([info = new_pass](vk::CommandBuffer cmdbuf) {
@@ -102,6 +112,39 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
     });
 
     pass = new_pass;
+}
+
+void RenderManager::ReportPassTrace() {
+#if !THOR_FRAME_PROFILING
+    return;
+#else
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_trace_log < std::chrono::seconds{1} || pass_trace.empty()) {
+        pass_trace.clear();
+        return;
+    }
+    last_trace_log = now;
+
+    // Give each distinct colour target of this frame a small number, so the sequence shows the
+    // switching pattern rather than a list of handles.
+    std::vector<vk::Image> targets;
+    std::string sequence;
+    u32 total_draws = 0;
+    for (const TracedPass& entry : pass_trace) {
+        const auto it = std::find(targets.begin(), targets.end(), entry.color);
+        std::size_t id = static_cast<std::size_t>(std::distance(targets.begin(), it));
+        if (it == targets.end()) {
+            targets.push_back(entry.color);
+        }
+        total_draws += entry.draws;
+        if (sequence.size() < 1200) {
+            sequence += fmt::format("{}({}x{}):{} ", id, entry.width, entry.height, entry.draws);
+        }
+    }
+    LOG_INFO(Render_Vulkan, "ThorPasses passes={} targets={} draws={} seq={}", pass_trace.size(),
+             targets.size(), total_draws, sequence);
+    pass_trace.clear();
+#endif
 }
 
 void RenderManager::EndRendering() {

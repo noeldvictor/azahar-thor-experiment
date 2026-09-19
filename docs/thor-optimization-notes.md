@@ -9402,3 +9402,17 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   extracted and viewed was game content, the white tutorial boxes that the automated A presses
   open and close, and the mech's energy effect in the space cutscene. No artifact frame was
   found on either panel.
+- Render pass trace (2026-09-19, E.X. Troopers engine scene, 2x). One frame: 90 passes, 10
+  colour targets, 813 draws. The repeating block is
+  `0(512x1024) 1(256x512) 2(512x1024) 2(128x40) 2(128x56) 2(8x256) 3(128x256) 2(128x256)
+  4(128x256) 5(64x128) 4(64x128) 6(64x128) 7(32x64) 6(32x64) 8(32x64) 9(512x1024):271`,
+  about six times per frame. Sizes are the render area after the 2x scale. The alternation
+  between a target and its neighbour is a ping-pong blur in the guest.
+- Full render area A/B on that scene: off gave frame 11.07 ms, cmd 4.11 ms, swap 1.86 ms, GPU
+  92.8% at 680 MHz, passes 69 to 77 per swap with 43 to 48 colour switches; on gave frame
+  8.97 ms, cmd 3.86 ms, swap 0.07 ms, GPU 74.1% at 615 MHz, passes about 90. Kept on.
+- Resolution sweep on that scene: 1x frame 8.40 ms, cmd 3.73, rem 4.48, GPU 36.3%; 2x 8.97 ms,
+  cmd 3.86, rem 4.91, GPU 74.1%; 3x 10.29 ms, cmd 4.30, rem 4.96, GPU 99.1% at 680 MHz. All
+  three held 100% speed, so this scene is not the constraint; the snow field is.
+- Save states are tied to the emulator build that wrote them. After a rebuild the app shows
+  "Savestate version mismatch" and the MCP run must tap Continue, or record a fresh state.

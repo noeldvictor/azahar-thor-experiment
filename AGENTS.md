@@ -1745,3 +1745,24 @@
   from the host; the app overwrites it in place, because removing it underneath the storage
   provider leaves a stale entry. This is the same user-directory channel as ThorMaintenance and
   it adds no exported component.
+- Render pass structure, measured (2026-09-19). A per-frame trace of the pass sequence
+  (`ThorPasses`, profiling builds only, one frame per second) shows the passes are the game's
+  own. One E.X. Troopers frame is about 90 passes over 10 colour targets: one main pass of 271
+  draws into a 512x1024 target, and around 13 tiny passes of one draw each that ping-pong
+  between small targets, 128x40 down to 32x64, repeated about six times per frame. That is a
+  bloom or blur chain in the guest, so the 62 colour target switches per frame cannot be
+  removed from the emulator side. Only their cost can be reduced.
+- Full render area, re-tested and kept on (2026-09-19). Turning `kFullRenderArea` off in the
+  E.X. Troopers engine scene made the frame 11.07 ms at 92.8% GPU and 680 MHz, against 8.97 ms
+  at 74.1% and 615 MHz with it on, although it lowered the pass count from 90 to 77. Fewer
+  passes are not automatically cheaper: expanding a pass to the framebuffer rectangle wins more
+  from reuse than it loses in tile traffic. Do not turn it off again without this measurement.
+- Resolution scaling of the same scene (2026-09-19), used to split fixed cost from pixel cost:
+  1x 8.40 ms frame at 36.3% GPU, 2x 8.97 ms at 74.1%, 3x 10.29 ms at 99.1% and 680 MHz. That
+  fits about 2.0 ms of fixed cost per frame plus about 1.0 ms per unit of 1x pixels, so at 2x
+  roughly a third of the GPU time is per-pass overhead and two thirds scales with area. Both
+  attachments always store, so every pass writes its render area back to memory; relaxing the
+  depth store is not safe here because the same depth surface is reused across passes.
+- Open, and the next step if this is taken further: per-pass GPU timestamps. The counters and
+  the trace name the structure but not which passes spend the time. Do not change the render
+  path again without that; two hypotheses were already disproved by measurement today.

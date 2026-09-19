@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <vector>
+#include <chrono>
 #include <mutex>
 
 #include "common/math_util.h"
@@ -65,6 +67,9 @@ public:
     vk::RenderPass GetRenderpass(VideoCore::PixelFormat color, VideoCore::PixelFormat depth,
                                  bool is_clear);
 
+    /// Logs the render pass sequence of one frame, at most once per second. Diagnostic only.
+    void ReportPassTrace();
+
 private:
     /// Creates a renderpass configured appropriately and stores it in cached_renderpasses
     vk::UniqueRenderPass CreateRenderPass(vk::Format color, vk::Format depth,
@@ -84,6 +89,16 @@ private:
     bool shadow_rendering{};
     RenderPass pass{};
     u32 num_draws{};
+
+    /// One entry per render pass of the current frame, for ReportPassTrace().
+    struct TracedPass {
+        vk::Image color;
+        u32 width;
+        u32 height;
+        u32 draws;
+    };
+    std::vector<TracedPass> pass_trace;
+    std::chrono::steady_clock::time_point last_trace_log{};
 };
 
 } // namespace Vulkan

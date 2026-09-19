@@ -1153,6 +1153,7 @@ void RendererVulkan::SwapBuffers() {
     system.perf_stats->EndSwap();
     rasterizer.TickFrame();
     EndFrame();
+    renderpass_cache.ReportPassTrace();
     VideoCore::ReportFrameProfileWindow();
 }
 
