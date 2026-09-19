@@ -9380,3 +9380,25 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   recordings of both panels, per-frame average luma within 0.5 of the median on the main
   panel (400 frames) and on the second panel (494 frames); no flash frame. The reported
   flashes coincided with automated A presses opening tutorial boxes.
+- Snow field diagnosis (2026-09-19). The overlay at 2x read Speed 48%, FPS 29, frame 34.5 ms,
+  of which guest command processing was 28.6 ms while the emulation thread used 35% of a core
+  and the GPU was 67% busy at 615 MHz: the thread was blocked, not computing. The first two
+  guesses were wrong and are recorded so they are not retried. Texture downloads: the profiler
+  reported `finish=0` and `download_per_swap=0.000`, so there are none. The uniform ring at
+  8 MiB: raising it to 64 MiB left `wait_ms_per_swap` at 21.5 ms unchanged. New counters then
+  showed exactly 1.000 blocking waits per swap at 21.5 ms, matching `stream_wraps_per_swap` of
+  1.1 to 1.3, and a wrap log named the ring: the lookup-table texel buffer at 2 MiB, wrapping
+  every 32 to 37 ms against 141 ms for the vertex ring and 814 ms for the uniform ring.
+  After raising it to 32 MiB: blocking wait 0.23 to 0.42 ms per swap, that ring wrapping every
+  370 to 406 ms, overlay frame 21.5 ms with command processing 6.3 ms and swap 10.0 ms, FPS 46,
+  GPU 99.9% at 680 MHz. The remaining cost is the GPU work itself: 92 render pass begins, 62
+  colour target switches, and 4.9 display transfers at 1.875 Mpix per swap.
+- Fast forward, measured (2026-09-19). The limiter only sleeps a game that runs ahead of the
+  target, so a scene below 100% ignores the setting entirely; at 200 the snow field measured
+  the same as at 100. The space scene reached 117% at a 200 limit on the same build, which is
+  why fast forward appears to work there and not in the snow field.
+- Flash check (2026-09-19): a 110-second recording across the intro and the title screen showed
+  50 large frame-to-frame brightness steps and 11 isolated single-frame steps. Every one
+  extracted and viewed was game content, the white tutorial boxes that the automated A presses
+  open and close, and the mech's energy effect in the space cutscene. No artifact frame was
+  found on either panel.

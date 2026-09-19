@@ -66,6 +66,15 @@ of a raw `adb` command when a tool exists.
 - `app_maintenance` runs one operation inside the app on its private driver directories: list,
   verify, clear_redirect, reinstall_driver, or system_driver. The app reads the request from
   `thor_maintenance.txt` in the user directory at startup and writes `log/thor_maintenance.json`.
+- `emu_command` sends one command to the running game: `save_state`, `load_state`, `states`,
+  `perf`, or `perf_log`. The app polls `thor_command.txt` in the user directory once per second
+  while the emulation screen is in front and writes `log/thor_command.json`. Save a state at the
+  scene you measure, then load it; a replay to a late scene costs seven minutes and a load costs
+  seconds.
+- `perf_stats` returns the emulator's own numbers, averaged over samples: game FPS, speed
+  percent, and the frame time split in milliseconds (`gpu_cmd` is guest command processing,
+  `swap` includes waiting for the host GPU). Use it instead of reading the overlay from a
+  screenshot. Speed percent is the number that decides whether a scene runs at full speed.
 - `ui_dump` and `ui_tap` read the visible UI of a panel and press a node by its text.
 - `driver_env` sets environment variables for the GPU driver at the next launch through
   `thor_driver_env.txt` in the user directory, for example `TU_DEBUG` flags for Turnip.

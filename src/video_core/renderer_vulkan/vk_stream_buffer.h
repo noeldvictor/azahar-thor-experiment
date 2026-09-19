@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include <optional>
 #include <span>
 #include <tuple>
@@ -67,6 +69,8 @@ private:
     vk::DeviceMemory memory;  ///< Memory allocation.
     u8* mapped{};             ///< Pointer to the mapped memory
     u64 stream_buffer_size{}; ///< Stream buffer size.
+    std::chrono::steady_clock::time_point last_wrap_log{}; ///< Rate limit for wrap logs.
+    std::chrono::steady_clock::time_point last_wrap_time{}; ///< Previous wrap instant.
     vk::BufferUsageFlags usage{};
     BufferType type;
 

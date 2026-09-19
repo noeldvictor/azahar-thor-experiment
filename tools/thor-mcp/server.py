@@ -22,6 +22,7 @@ Environment:
 """
 from __future__ import annotations
 
+import json
 import asyncio
 import os
 import re
@@ -605,6 +606,69 @@ def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25
     if not text.strip():
         raise RuntimeError("the app wrote no result; check that the user directory is granted")
     return text
+
+
+@mcp.tool()
+def emu_command(command: str = "perf", argument: str = "", wait_seconds: int = 4) -> str:
+    """Send one command to the running game and return the JSON result.
+
+    The app polls thor_command.txt in the user directory once per second while a game runs and
+    writes log/thor_command.json. The game must be running; nothing outside the user directory
+    is touched. Commands:
+      save_state <slot>   write a save state, so an experiment can return to a scene in seconds
+      load_state <slot>   load a save state
+      states              list the slots that hold a state
+      perf                return the performance numbers only
+      perf_log on|off     log the performance numbers to logcat once per second
+    Every result carries "perf": game FPS, speed percent, and the frame time split in
+    milliseconds (frame_time, svc, ipc, gpu_cmd, swap, remaining)."""
+    allowed = {"save_state", "load_state", "states", "perf", "perf_log"}
+    if command not in allowed:
+        raise ValueError(f"command must be one of {sorted(allowed)}")
+    if _pid() is None:
+        raise RuntimeError("The app is not running. Launch a game first.")
+    result_remote = f"{USER_DIR}/log/thor_command.json"
+    request_id = f"{time.time():.3f}"
+    payload = command + chr(10) + argument + chr(10) + request_id + chr(10)
+    _write_remote_text(f"{USER_DIR}/thor_command.txt", payload)
+    deadline = time.time() + max(wait_seconds, 3)
+    while time.time() < deadline:
+        text = _read_remote_text(result_remote).strip()
+        if text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                parsed = {}
+            # The app echoes the request id, so a result left over from an earlier command is
+            # never mistaken for this one.
+            if parsed.get("id") == request_id:
+                return text
+        _sh("sleep 0.5", timeout=10)
+    raise RuntimeError(
+        "No result. The game must be running with the emulation screen in front; the app polls "
+        "once per second."
+    )
+
+
+@mcp.tool()
+def perf_stats(samples: int = 3, interval: float = 1.0) -> dict:
+    """Read the emulator's own performance numbers from the running game, averaged over samples.
+
+    Returns game FPS, speed percent, and the frame time split in milliseconds. Speed percent is
+    the number that says whether a scene runs at full speed; the frame time split says where a
+    slow frame goes (gpu_cmd is guest command processing, swap includes waiting for the host
+    GPU). Prefer this over reading the on-screen overlay from a screenshot."""
+    rows = []
+    for index in range(max(samples, 1)):
+        if index:
+            _sh(f"sleep {interval}", timeout=int(interval) + 10)
+        rows.append(json.loads(emu_command("perf"))["perf"])
+    keys = sorted({key for row in rows for key in row})
+    return {
+        "samples": len(rows),
+        "mean": {key: round(sum(row.get(key, 0.0) for row in rows) / len(rows), 3) for key in keys},
+        "rows": rows,
+    }
 
 
 @mcp.tool()

@@ -109,8 +109,15 @@ void Scheduler::WaitWorker() {
 
 void Scheduler::Wait(u64 tick) {
     VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::SchedulerWaits);
+    // Ticks the GPU has already passed are the common case: the stream buffers ask about every
+    // allocation they recycle. Answer those from the cached tick without a timer or a driver
+    // call, and measure only the waits that really block.
+    if (master_semaphore->IsFree(tick)) {
+        return;
+    }
+    VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::SchedulerBlockingWaits);
     VideoCore::ScopedFrameProfileTimer timer{
-        VideoCore::FrameProfileEvent::SchedulerWaitNanoseconds};
+        VideoCore::FrameProfileEvent::SchedulerBlockingWaitNanoseconds};
     if (tick >= master_semaphore->CurrentTick()) {
         // Make sure we are not waiting for the current tick without signalling
         Flush();

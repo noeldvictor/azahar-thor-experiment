@@ -7,6 +7,7 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
 #include "common/alignment.h"
 #include "common/assert.h"
@@ -14,6 +15,7 @@
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_memory_util.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/frame_profile.h"
 #include "video_core/renderer_vulkan/vk_stream_buffer.h"
 
 namespace Vulkan {
@@ -126,6 +128,21 @@ std::tuple<u8*, u32, bool> StreamBuffer::Map(u32 size, u64 alignment) {
     bool invalidate{false};
     if (offset + size > stream_buffer_size) {
         // The buffer would overflow, save the amount of used watches and reset the state.
+        VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::StreamBufferWraps);
+        {
+            const auto wrap_now = std::chrono::steady_clock::now();
+            if (wrap_now - last_wrap_log > std::chrono::seconds{1}) {
+                const auto since = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                       wrap_now - last_wrap_time)
+                                       .count();
+                LOG_INFO(Render_Vulkan,
+                         "ThorWrap buffer={} size_kib={} usage={} ms_since_previous_wrap={}",
+                         BufferTypeName(type), stream_buffer_size / 1024,
+                         vk::to_string(usage), since);
+                last_wrap_log = wrap_now;
+            }
+            last_wrap_time = wrap_now;
+        }
         invalidate = true;
         invalidation_mark = current_watch_cursor;
         current_watch_cursor = 0;

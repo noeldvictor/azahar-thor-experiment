@@ -42,8 +42,17 @@ using namespace Common::Literals;
 using namespace Pica::Shader::Generator;
 
 constexpr u64 STREAM_BUFFER_SIZE = 64_MiB;
-constexpr u64 UNIFORM_BUFFER_SIZE = 8_MiB;
-constexpr u64 TEXTURE_BUFFER_SIZE = 2_MiB;
+// A scene can issue a few thousand draws per frame, and each draw reserves up to four uniform
+// blocks. At 8 MiB the ring wrapped inside every frame, so the next map waited on the ticks of
+// the frame just submitted and the emulation thread ran in lockstep with the GPU. Hold several
+// frames of uniforms so a wrap only ever waits on work that finished long ago.
+constexpr u64 UNIFORM_BUFFER_SIZE = 64_MiB;
+// The lighting and procedural-texture lookup tables are rewritten whenever the guest marks them
+// dirty, which a busy scene does thousands of times per frame. At 2 MiB the ring wrapped once per
+// frame, so the next map waited on the frame still in flight and the emulation thread ran in
+// lockstep with the GPU. TextureBufferSize() clamps this to what the device allows for a texel
+// buffer view.
+constexpr u64 TEXTURE_BUFFER_SIZE = 32_MiB;
 
 constexpr vk::BufferUsageFlags BUFFER_USAGE =
     vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer;
@@ -1248,8 +1257,11 @@ void RasterizerVulkan::UploadUniforms(bool accelerate_draw) {
         return;
     }
 
+    // Reserve only the blocks this draw can write. The geometry block is written for an
+    // expanded draw alone, so reserving it everywhere cost a third of the ring for nothing.
     const u32 uniform_size = uniform_size_aligned_vs_pica + uniform_size_aligned_vs +
-                             uniform_size_aligned_fs + uniform_size_aligned_gs_pica;
+                             uniform_size_aligned_fs +
+                             (want_gs_pica ? uniform_size_aligned_gs_pica : 0);
     auto [uniforms, offset, invalidate] =
         uniform_buffer.Map(uniform_size, uniform_buffer_alignment);
 

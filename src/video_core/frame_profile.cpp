@@ -92,6 +92,13 @@ void ReportFrameProfileWindow() {
         values[Index(FrameProfileEvent::SchedulerWorkerDrains)],
         MillisecondsPerSwap(values, FrameProfileEvent::SchedulerWorkerDrainNanoseconds, swaps));
     LOG_INFO(Render_Vulkan,
+             "ThorFrameProfile blocking blocking_waits_per_swap={:.3f} "
+             "blocking_wait_ms_per_swap={:.3f} stream_wraps_per_swap={:.3f}",
+             PerSwap(values, FrameProfileEvent::SchedulerBlockingWaits, swaps),
+             MillisecondsPerSwap(values, FrameProfileEvent::SchedulerBlockingWaitNanoseconds,
+                                 swaps),
+             PerSwap(values, FrameProfileEvent::StreamBufferWraps, swaps));
+    LOG_INFO(Render_Vulkan,
              "ThorFrameProfile renderpass begin_per_swap={:.3f} reuse_per_swap={:.3f} "
              "end_per_swap={:.3f} end_image_barriers_per_swap={:.3f} mali_flushes={}",
              PerSwap(values, FrameProfileEvent::RenderPassBegins, swaps),

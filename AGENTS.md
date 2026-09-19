@@ -1722,3 +1722,26 @@
   afterwards, so that scene is 30 FPS by the game's own loop; the mech fight is 60). Result:
   two nine-minute runs with zero stalls and zero rebuilds, and the present-thread timeout lines
   fell from thousands to under 200 per run.
+- Stream ring sizes, accepted (2026-09-19). A scene issues about 2000 draws per frame, and each
+  draw can map the vertex ring, the uniform ring, and the lookup-table ring. A ring that holds
+  about one frame of data wraps every frame, and the next map then waits on the frame still in
+  flight: the emulation thread and the GPU ran in lockstep instead of overlapping. Measured on
+  the E.X. Troopers snow field with new counters (`blocking_waits_per_swap`,
+  `blocking_wait_ms_per_swap`, `stream_wraps_per_swap`): exactly one blocking wait per swap
+  costing 21.5 ms, with the lookup-table ring wrapping every 32 to 37 ms. `TEXTURE_BUFFER_SIZE`
+  is now 32 MiB (still clamped by the device's texel buffer limit) and `UNIFORM_BUFFER_SIZE` is
+  64 MiB. After the change the blocking wait is 0.23 to 0.42 ms per swap and that ring wraps
+  every 370 to 406 ms. The frame went from 34.5 ms to 21.5 ms, guest command processing from
+  28.6 ms to 6.3 ms, and the scene from 29 to 46 FPS. The GPU then sits at 99.9% and 680 MHz, so
+  the scene is GPU bound from here and the render path is the next target. Cost: about 116 MiB
+  more host-visible memory.
+- `Scheduler::Wait` answers an already-passed tick from the cached GPU tick and returns before
+  the timer and the driver call. The rings ask about nearly every allocation they recycle, about
+  7700 times per swap, so this path must stay cheap. Keep the blocking counters: they separate a
+  real stall from a cheap query and they found this bug.
+- Runtime command channel (2026-09-19): the app polls `thor_command.txt` once per second while a
+  game runs and answers in `log/thor_command.json`, echoing the request id the host sends. It
+  carries save states, load states, and the performance numbers. Do not delete the result file
+  from the host; the app overwrites it in place, because removing it underneath the storage
+  provider leaves a stale entry. This is the same user-directory channel as ThorMaintenance and
+  it adds no exported component.
