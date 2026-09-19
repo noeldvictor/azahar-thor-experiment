@@ -644,6 +644,12 @@ struct Values {
     /// before and after a rebuild. It is off by default and belongs to testing, not to players.
     Setting<bool> allow_savestate_mismatch{false, Keys::allow_savestate_mismatch};
 
+    /// Computes the vector normalises in the fragment lighting path once instead of repeating
+    /// them for every light and every lookup table. The result is the same; this exists so one
+    /// build can measure both paths against the same save state, because a state written by one
+    /// build does not restore into another.
+    Setting<bool> fast_fragment_lighting{true, Keys::fast_fragment_lighting};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

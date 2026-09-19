@@ -103,7 +103,11 @@ object ThorRuntime {
                     val listed = NativeLibrary.getSavestateInfo()?.any { it.slot == slot } ?: false
                     result.put("listed", listed)
                     NativeLibrary.loadState(slot)
-                    result.put("loaded", true)
+                    // listed is the honest signal. A state written by another build is not
+                    // listed, and the load is dropped even when the core is told to accept a
+                    // version mismatch, so reporting success unconditionally hid real failures.
+                    result.put("requested", true)
+                    result.put("loaded", listed)
                 }
                 "states" -> {
                     val info = NativeLibrary.getSavestateInfo()

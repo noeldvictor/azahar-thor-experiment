@@ -4,6 +4,7 @@
 
 #include <boost/container/small_vector.hpp>
 #include "video_core/shader/generator/pica_fs_config.h"
+#include "common/settings.h"
 #include "video_core/shader/generator/spv_fs_shader_gen.h"
 
 namespace Pica::Shader::Generator::SPIRV {
@@ -365,19 +366,28 @@ void FragmentModule::WriteLighting() {
     // The view vector is the same for every light and every lookup, so normalise it once. Each
     // normalise costs a dot product, a reciprocal square root and three multiplies, and this one
     // used to be repeated for every light and again for every lookup that light performed.
-    const Id normalized_view{OpNormalize(vec_ids.Get(3), view)};
+    // The setting keeps the old path available so one build can measure both against the same
+    // save state; the image is identical either way.
+    const bool fast_lighting{Settings::values.fast_fragment_lighting.GetValue()};
+    const Id cached_normalized_view{fast_lighting ? OpNormalize(vec_ids.Get(3), view) : Id{}};
+    const auto view_n = [&]() -> Id {
+        return fast_lighting ? cached_normalized_view : OpNormalize(vec_ids.Get(3), view);
+    };
+    const auto half_n = [&]() -> Id {
+        return fast_lighting ? normalized_half_vector : OpNormalize(vec_ids.Get(3), half_vector);
+    };
     const auto get_lut_value = [&](LightingRegs::LightingSampler sampler, u32 light_num,
                                    LightingRegs::LightingLutInput input, bool abs) -> Id {
         Id index{};
         switch (input) {
         case LightingRegs::LightingLutInput::NH:
-            index = OpDot(f32_id, normal, normalized_half_vector);
+            index = OpDot(f32_id, normal, half_n());
             break;
         case LightingRegs::LightingLutInput::VH:
-            index = OpDot(f32_id, normalized_view, normalized_half_vector);
+            index = OpDot(f32_id, view_n(), half_n());
             break;
         case LightingRegs::LightingLutInput::NV:
-            index = OpDot(f32_id, normal, normalized_view);
+            index = OpDot(f32_id, normal, view_n());
             break;
         case LightingRegs::LightingLutInput::LN:
             index = OpDot(f32_id, light_vector, normal);
@@ -391,11 +401,12 @@ void FragmentModule::WriteLighting() {
                 // Note: even if the normal vector is modified by normal map, which is not the
                 // normal of the tangent plane anymore, the half angle vector is still projected
                 // using the modified normal vector.
-                const Id normal_dot_half_vector{OpDot(f32_id, normal, normalized_half_vector)};
+                const Id half_unit{half_n()};
+                const Id normal_dot_half_vector{OpDot(f32_id, normal, half_unit)};
                 const Id normal_mul_dot{
                     OpVectorTimesScalar(vec_ids.Get(3), normal, normal_dot_half_vector)};
                 const Id half_angle_proj{
-                    OpFSub(vec_ids.Get(3), normalized_half_vector, normal_mul_dot)};
+                    OpFSub(vec_ids.Get(3), half_unit, normal_mul_dot)};
 
                 // Note: the half angle vector projection is confirmed not normalized before the dot
                 // product. The result is in fact not cos(phi) as the name suggested.
@@ -447,8 +458,10 @@ void FragmentModule::WriteLighting() {
         light_vector = OpNormalize(vec_ids.Get(3), light_vector);
 
         spot_dir = GetLightMember(5);
-        half_vector = OpFAdd(vec_ids.Get(3), normalized_view, light_vector);
-        normalized_half_vector = OpNormalize(vec_ids.Get(3), half_vector);
+        half_vector = OpFAdd(vec_ids.Get(3), view_n(), light_vector);
+        if (fast_lighting) {
+            normalized_half_vector = OpNormalize(vec_ids.Get(3), half_vector);
+        }
 
         // Compute dot product of light_vector and normal, adjust if lighting is one-sided or
         // two-sided

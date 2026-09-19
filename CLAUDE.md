@@ -92,6 +92,25 @@ When a test needs a device capability that no tool provides, add a tool to the s
 it here. Do not add an exported Android component for that; the request file above is the
 channel into the app.
 
+The server lives at `azahar/tools/thor-mcp/server.py`. Use that absolute path: the working
+directory is sometimes the workspace root and a relative path silently fails there.
+
+Rules for driving the device, learned the hard way on 2026-09-19:
+
+- **Never navigate the game with button presses.** The user plays; the emulator is only
+  measured. Blind repeated presses skip scenes and dialogue and land the game somewhere nobody
+  intended, and every reading taken that way was void. A single `press` to answer a prompt the
+  user asked about is fine.
+- **Never wait for the boot videos to play out.** They run for minutes and a save state load is
+  ignored while they do. Ask the user to bring the game to the scene, or to load the state from
+  the in-game menu, then measure.
+- **A save state only restores in the build that wrote it.** Installing a new APK invalidates
+  every state, and the load is dropped without an error. To compare a code change, put it behind
+  a setting and measure both sides on one build, as `fast_fragment_lighting` does. Reinstalling
+  between the two halves of a comparison wastes the run.
+- **Confirm the scene with a screenshot before recording a number.** A video or a cutscene reads
+  as full speed with the GPU near idle and looks like a result.
+
 The tools depend on these facts: package `org.azahar_emu.azahar.debug`, user directory
 `/storage/emulated/0/Azaharuser`, ROM tree `2664-21DE:Roms/n3ds`, USB serial `c3ca0370`. Change
 them in `.mcp.json` when the device changes.
