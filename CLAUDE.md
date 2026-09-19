@@ -88,6 +88,14 @@ GPU busy percent at a fixed frame rate as the primary efficiency number, and tre
 that cannot hold full speed at 2x as a bug to find in the render path: pass restarts, tile
 loads and stores, needless copies, needless downloads. Do not accept it as the game's cost.
 
+Fast forward is part of that expectation. At 2x resolution every scene must reach 200% speed
+with the per-title frame limit at 200. A scene that cannot is a bug with the same causes, and
+the GPU busy percent at 100% speed predicts it: 68% busy at 100% speed means the GPU cannot
+give 200%. Measure fast forward with the speed overlay on (`Layout.performance_overlay_show_speed`)
+and read the guest FPS, the speed, the GPU busy percent, and the emulation thread share. The
+panels are pinned at 60 Hz, so the screen shows at most 60 frames per second; fast forward is
+game speed, not frame rate.
+
 ## Finishing a task
 
 Cleanup is part of finishing. Before you hand work back, remove the stale CMake configuration
