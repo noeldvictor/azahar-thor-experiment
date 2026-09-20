@@ -9,8 +9,16 @@
 #   Japanese:      Cheats/E.X. Troopers (JPN)/0004000000053700.txt (codes by @NanashiFinal13)
 # All of the codes below were read from those two files rather than retyped from a summary.
 #
-# The game runs at 30 FPS by design. A 60 FPS code doubles the presentation rate and the AYN
-# Thor holds it at 2x with the Snapdragon GSR filter; see the bundled game profile.
+# This game already runs at 60 FPS. Measured on the AYN Thor with no cheat enabled: 59.74 to
+# 59.83 game FPS at 99.97% speed in the snow field, confirmed by grepping the device cheat file
+# for the *citra_enabled marker and finding none. Videos in this game present at 30.
+# So the codes below are a frame rate target override rather than an unlock: they write 60.0f
+# (42700000) or 30.0f (41F00000) to the game's target. The 30 FPS code is the useful one on a
+# handheld, because halving the presentation rate is the cheapest way to buy headroom in a heavy
+# scene. Do not enable a 60 FPS code expecting it to double anything.
+#
+# An earlier version of this file claimed the game is 30 FPS by design. That was wrong and is
+# corrected here.
 
 [60 FPS, hold R for 30 - English Patch]
 D3000000 00000000
