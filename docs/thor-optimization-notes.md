@@ -9570,8 +9570,10 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   a 16-bit type. Relaxed precision decorations were tried before and the driver ignored them, so
   this has to be real 16-bit types in the generated SPIR-V, not decorations. The combiner is the
   place to start: the rounding experiment proved that combiner instructions are what covers the
-  pixels, so halving the whole chain should be worth several times what removing the rounding was.
-  Precision is not a concern there, because each stage lands in eight bits either way.
+  pixels. Precision is not a concern there, because each stage lands in eight bits either way.
+  **Superseded on 2026-09-20: do not do this.** Sizing the arithmetic properly put the whole
+  fragment ALU at about 13% of the frame, so halving it with 16-bit types is worth roughly 6%,
+  not the several times the rounding result suggested. See the frame accounting below.
 - Frame fully accounted for (2026-09-20). Snow field, save state 5, 2x, GPU 680 MHz. Fragment
   arithmetic is about 13% of the frame, from removing roughly 36 of about 100 shader instructions
   for 4.8%. Framebuffer compression is already saving 12%, measured by turning it off with
