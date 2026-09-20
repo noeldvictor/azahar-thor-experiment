@@ -1048,6 +1048,49 @@ class SettingsFragmentPresenter(private val fragmentView: SettingsFragmentView) 
                 )
             )
             add(
+                SliderSetting(
+                    IntSetting.SGSR_SHARPNESS,
+                    R.string.sgsr_sharpness_name,
+                    R.string.sgsr_sharpness_description,
+                    0,
+                    300,
+                    "%",
+                    IntSetting.SGSR_SHARPNESS.key,
+                    IntSetting.SGSR_SHARPNESS.defaultValue.toFloat()
+                )
+            )
+            add(
+                SingleChoiceSetting(
+                    IntSetting.BLENDED_SHADING_RATE,
+                    R.string.blended_shading_rate_name,
+                    R.string.blended_shading_rate_description,
+                    R.array.shadingRateNames,
+                    R.array.shadingRateValues,
+                    IntSetting.BLENDED_SHADING_RATE.key,
+                    IntSetting.BLENDED_SHADING_RATE.defaultValue
+                )
+            )
+            add(
+                SwitchSetting(
+                    BooleanSetting.USE_SHADER_DRAW_RULES,
+                    R.string.use_shader_draw_rules_name,
+                    R.string.use_shader_draw_rules_description,
+                    BooleanSetting.USE_SHADER_DRAW_RULES.key,
+                    BooleanSetting.USE_SHADER_DRAW_RULES.defaultValue
+                )
+            )
+            add(
+                SingleChoiceSetting(
+                    IntSetting.TILED_RENDERING,
+                    R.string.tiled_rendering_name,
+                    R.string.tiled_rendering_description,
+                    R.array.tiledRenderingNames,
+                    R.array.tiledRenderingValues,
+                    IntSetting.TILED_RENDERING.key,
+                    IntSetting.TILED_RENDERING.defaultValue
+                )
+            )
+            add(
                 SwitchSetting(
                     BooleanSetting.SHADERS_ACCURATE_MUL,
                     R.string.shaders_accurate_mul,

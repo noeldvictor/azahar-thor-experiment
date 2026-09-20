@@ -694,6 +694,12 @@ struct Values {
     // Per-title draw rules, the targeting layer. Comma separated "<fs hash>:<rate>" pairs, for
     // example "a1b2c3d4e5f60718:2". Empty means no rules and the core guesses nothing.
     Setting<std::string> shader_shading_rules{"", Keys::shader_shading_rules};
+    // Master switch for the rule file, so it can be turned off from the interface without
+    // editing or deleting ShaderRules/<title id>.txt.
+    Setting<bool> use_shader_draw_rules{true, Keys::use_shader_draw_rules};
+    // Snapdragon GSR edge sharpening, as a percentage of Qualcomm's reference value of 2.0.
+    // 100 is the reference, 0 is plain upscaling with no sharpening.
+    SwitchableSetting<u32, true> sgsr_sharpness{100, 0, 300, Keys::sgsr_sharpness};
 
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};

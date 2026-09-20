@@ -505,6 +505,18 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # When this is set it takes precedence and the blanket setting above is ignored.
 )") DECLARE_KEY(shader_shading_rules) BOOST_HANA_STRING(R"(
 
+# Whether the per-title draw rule file is applied. Turning this off ignores the rules without
+# deleting the file, so a rule set can be compared against the untouched picture in two launches.
+# 0: Off, 1 (default): On
+)") DECLARE_KEY(use_shader_draw_rules) BOOST_HANA_STRING(R"(
+
+# How hard the Snapdragon GSR screen filter sharpens edges, as a percentage of Qualcomm's
+# reference value. 0 turns sharpening off and leaves plain upscaling, 100 is the reference, and
+# higher values sharpen more and will eventually ring on high contrast edges. Only has an effect
+# while screen_filter is set to Snapdragon GSR and a screen is actually being upscaled.
+# 0 to 300, 100 (default)
+)") DECLARE_KEY(sgsr_sharpness) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

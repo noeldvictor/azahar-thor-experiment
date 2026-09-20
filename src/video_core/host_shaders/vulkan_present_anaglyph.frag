@@ -31,6 +31,7 @@ layout (push_constant, std140) uniform DrawInfo {
     int layer;
     int reverse_interlaced;
     int orientation;
+    float sgsr_sharpness;
 };
 
 layout (set = 0, binding = 0) uniform sampler2D screen_textures[3];

@@ -65,8 +65,10 @@ struct PresentUniformData {
     int layer = 0;
     int reverse_interlaced = 0;
     int orientation = 0;
+    // Snapdragon GSR edge sharpening strength. Qualcomm's reference value is 2.0.
+    float sgsr_sharpness = 2.0f;
 };
-static_assert(sizeof(PresentUniformData) == 100,
+static_assert(sizeof(PresentUniformData) == 104,
               "PresentUniformData does not structure in shader!");
 
 class RendererVulkan : public VideoCore::RendererBase {

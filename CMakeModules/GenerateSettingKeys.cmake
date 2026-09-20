@@ -158,6 +158,8 @@ foreach(KEY IN ITEMS
     "tiled_rendering"
     "blended_shading_rate"
     "shader_shading_rules"
+    "use_shader_draw_rules"
+    "sgsr_sharpness"
     "language" # FIXME: DUPLICATE KEY (libretro equivalent: language_value)
     "web_api_url"
     "network_token"

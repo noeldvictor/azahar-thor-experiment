@@ -995,7 +995,10 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
 }
 
 void RasterizerVulkan::ReloadShadingRules() {
-    const std::string& text = Settings::values.shader_shading_rules.GetValue();
+    static const std::string kDisabled{};
+    const std::string& text = Settings::values.use_shader_draw_rules.GetValue()
+                                  ? Settings::values.shader_shading_rules.GetValue()
+                                  : kDisabled;
     if (text == shading_rules_text) {
         return;
     }

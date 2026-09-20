@@ -49,6 +49,7 @@ layout(push_constant, std140) uniform DrawInfo {
     int layer;
     int reverse_interlaced;
     int orientation;
+    float sgsr_sharpness;
 };
 
 layout(set = 0, binding = 0) uniform sampler2D screen_textures[3];
@@ -103,7 +104,9 @@ vec2 weightY(float dx, float dy, float c, float std) {
 void main() {
     const int mode = 1;
     const float edgeThreshold = 8.0 / 255.0;
-    const float edgeSharpness = 2.0;
+    // Qualcomm's reference value is 2.0; the setting scales it so the filter can be
+    // softened towards plain upscaling or pushed harder.
+    const float edgeSharpness = sgsr_sharpness;
 
     vec4 result;
     result.xyz = GetScreenLod(screen_id_l, frag_tex_coord).xyz;

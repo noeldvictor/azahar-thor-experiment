@@ -345,6 +345,30 @@
         <item>2</item>
     </integer-array>
 
+    <string-array name="tiledRenderingNames">
+        <item>@string/tiled_auto</item>
+        <item>@string/tiled_direct</item>
+        <item>@string/tiled_gmem</item>
+    </string-array>
+
+    <integer-array name="tiledRenderingValues">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </integer-array>
+
+    <string-array name="shadingRateNames">
+        <item>@string/shading_rate_off</item>
+        <item>@string/shading_rate_2x2</item>
+        <item>@string/shading_rate_4x4</item>
+    </string-array>
+
+    <integer-array name="shadingRateValues">
+        <item>1</item>
+        <item>2</item>
+        <item>4</item>
+    </integer-array>
+
     <string-array name="textureSamplingNames">
         <item>@string/game_controlled</item>
         <item>@string/nearest_neighbor</item>

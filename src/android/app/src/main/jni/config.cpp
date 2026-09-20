@@ -383,6 +383,8 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.tiled_rendering);
     ReadSetting("Utility", Settings::values.blended_shading_rate);
     ReadSetting("Utility", Settings::values.shader_shading_rules);
+    ReadSetting("Utility", Settings::values.use_shader_draw_rules);
+    ReadSetting("Renderer", Settings::values.sgsr_sharpness);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

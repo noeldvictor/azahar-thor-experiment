@@ -767,6 +767,8 @@ void RendererVulkan::DrawSingleScreen(u32 screen_id, float x, float y, float w, 
     draw_info.texcoords =
         Common::MakeVec(texcoords.left, texcoords.top, texcoords.right, texcoords.bottom);
     draw_info.orientation = static_cast<int>(orientation);
+    draw_info.sgsr_sharpness =
+        2.0f * static_cast<float>(Settings::values.sgsr_sharpness.GetValue()) / 100.0f;
     if (orientation == Layout::DisplayOrientation::Portrait ||
         orientation == Layout::DisplayOrientation::PortraitFlipped) {
         std::swap(h, w);
@@ -799,6 +801,8 @@ void RendererVulkan::DrawSingleScreenStereo(u32 screen_id_l, u32 screen_id_r, fl
     draw_info.texcoords =
         Common::MakeVec(texcoords.left, texcoords.top, texcoords.right, texcoords.bottom);
     draw_info.orientation = static_cast<int>(orientation);
+    draw_info.sgsr_sharpness =
+        2.0f * static_cast<float>(Settings::values.sgsr_sharpness.GetValue()) / 100.0f;
     if (orientation == Layout::DisplayOrientation::Portrait ||
         orientation == Layout::DisplayOrientation::PortraitFlipped) {
         std::swap(h, w);
