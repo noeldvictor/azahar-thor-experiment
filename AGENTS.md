@@ -1957,3 +1957,24 @@
   `4.6 ms + 14.6 ns per pixel` after it, across 2x, 3x and 4x, to better than half a millisecond.
   Use it to predict a change: a per-pixel saving helps most at 4x, and a fixed saving helps most
   at 2x. The GPU stays 99.8% busy in every row, so a CPU-side change cannot move these numbers.
+- Render pass barriers are not the fixed cost (2026-09-19, measured, not shipped). The snow field
+  ends about 97 render passes per frame at 2x and issues 102 image barriers, and each barrier
+  makes the GPU flush and drain, so they looked like the resolution independent part of the frame.
+  They are not. `skip_pass_barriers` removes every one of them and gains 3.4%: 118.17% against
+  114.24% at 2x with the frame limit at 200, which is 0.49 ms per frame, or about 4.9 us per
+  barrier. A correct version would have to track which images a later draw samples, and that is
+  not worth 0.5 ms. The setting stays off; it exists only to repeat this measurement. Do not
+  ship it: a draw that samples a pass output can read stale pixels even though this scene
+  happened to look right.
+- What the snow field actually issues per frame at 2x (2026-09-19, profiling build counters).
+  1,845 draw batches, all accelerated. 97 render pass begins and 1,748 pass reuses, so the pass
+  tracking already groups draws well. 66 of the 97 pass begins come from a colour target switch.
+  1.98 Mpix of display transfer blits, 0.59 Mpix of validation copies and 3.41 Mpix presented
+  across the two panels, against only 0.69 Mpix actually rendered. The draw count is the number
+  to attack next: 1,845 draws over 0.69 Mpix is 375 pixels per draw, so the GPU pays per-draw
+  setup far more often than it pays for pixels.
+- At 2x the CPU and the GPU are both at the limit (2026-09-19). With the frame limit at 200 the
+  frame is 14.63 ms, of which guest command processing is 8.89 ms and the rest of the emulation
+  thread 5.00 ms. The GPU model predicts 14.8 ms for the same frame. Reaching 200% at 2x needs
+  both halved, not one. At 3x and 4x the CPU stays near 14.7 ms while the frame grows to 27 and
+  45 ms, so those are GPU only.

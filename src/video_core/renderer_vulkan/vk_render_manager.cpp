@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #include "common/assert.h"
+#include "common/settings.h"
 #include "video_core/frame_profile.h"
 #include "video_core/rasterizer_cache/pixel_format.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -225,7 +226,13 @@ void RenderManager::EndRendering() {
 #endif
 
     scheduler.Record([images = images, aspects = aspects,
-                      shadow_rendering = shadow_rendering](vk::CommandBuffer cmdbuf) {
+                      shadow_rendering = shadow_rendering,
+                      skip_barriers = Settings::values.skip_pass_barriers.GetValue()](
+                         vk::CommandBuffer cmdbuf) {
+        if (skip_barriers) {
+            cmdbuf.endRenderPass();
+            return;
+        }
         u32 num_barriers = 0;
         vk::PipelineStageFlags pipeline_flags{};
         vk::AccessFlags src_access_flags{};

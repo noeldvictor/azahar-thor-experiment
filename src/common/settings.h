@@ -656,6 +656,13 @@ struct Values {
     /// still runs the whole shader. The image is the same. Turn it off to compare.
     Setting<bool> fixed_depth_range{true, Keys::fixed_depth_range};
 
+    /// Measurement switch. Skips the image barrier at the end of every render pass. The
+    /// snow field ends about a hundred passes per frame and each barrier makes the GPU
+    /// flush its caches and drain, so this shows what those barriers cost. It is not
+    /// correct: a later draw that samples the pass output may read stale pixels. Keep it
+    /// off unless you are taking that measurement.
+    Setting<bool> skip_pass_barriers{false, Keys::skip_pass_barriers};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

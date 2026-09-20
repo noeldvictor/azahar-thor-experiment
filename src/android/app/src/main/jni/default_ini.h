@@ -427,6 +427,12 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 0: Off, 1 (default): On
 )") DECLARE_KEY(fixed_depth_range) BOOST_HANA_STRING(R"(
 
+# Measurement switch. Skips the image barrier at the end of every render pass to show what
+# those barriers cost. Not correct: a later draw that samples the pass output may read
+# stale pixels. Leave it off unless you are taking that measurement.
+# 0 (default): Off, 1: On
+)") DECLARE_KEY(skip_pass_barriers) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

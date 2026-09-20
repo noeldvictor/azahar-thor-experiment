@@ -330,6 +330,7 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.allow_savestate_mismatch);
     ReadSetting("Utility", Settings::values.fast_fragment_lighting);
     ReadSetting("Utility", Settings::values.fixed_depth_range);
+    ReadSetting("Utility", Settings::values.skip_pass_barriers);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

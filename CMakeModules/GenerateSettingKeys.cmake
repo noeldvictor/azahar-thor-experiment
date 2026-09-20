@@ -150,6 +150,7 @@ foreach(KEY IN ITEMS
     "allow_savestate_mismatch"
     "fast_fragment_lighting"
     "fixed_depth_range"
+    "skip_pass_barriers"
     "language" # FIXME: DUPLICATE KEY (libretro equivalent: language_value)
     "web_api_url"
     "network_token"
