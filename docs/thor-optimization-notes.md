@@ -9572,3 +9572,34 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   place to start: the rounding experiment proved that combiner instructions are what covers the
   pixels, so halving the whole chain should be worth several times what removing the rounding was.
   Precision is not a concern there, because each stage lands in eight bits either way.
+- Frame fully accounted for (2026-09-20). Snow field, save state 5, 2x, GPU 680 MHz. Fragment
+  arithmetic is about 13% of the frame, from removing roughly 36 of about 100 shader instructions
+  for 4.8%. Framebuffer compression is already saving 12%, measured by turning it off with
+  `TU_DEBUG=noubwc`: 55.84% against 63.58% at 3x. All 95 render passes together are 0.53 ms,
+  priced at 5.5 us each from two points, 9.66 ms and 13.51 ms per frame at 1x with a forced
+  restart every 8 and every 2 draws against 8.42 ms untouched. Pass barriers are 0.49 ms. Texture
+  filtering is under 1%, from 64.00% against 63.58% with nearest filtering. Every fragment program
+  runs at 16 max_waves with 6 registers, so occupancy limits nothing. The GPU frequency table tops
+  out at 680 MHz, so every reading was taken at the ceiling.
+- Where the fragments are (2026-09-20). A pipeline statistics query counts 32.9 to 34.1 million
+  fragment shader invocations per frame at 2x across 95 passes, and 13.28 ms of summed pass time,
+  which is 0.39 ns or 0.27 GPU cycles per fragment, or 3.8 fragments per clock. Pairing each query
+  slot to its own render area splits the frame into 31,393,956 fragments in 512x1024 targets and
+  1,488,960 in everything smaller: 95.5% is the main scene target and 4.5% is the downsample
+  chain. The viewport and scissor for those passes are 496x800 inside a 512x1024 framebuffer, so
+  no pass shades the screen buffer's padding. The overdraw is about six times per pass across
+  roughly thirteen full screen passes, and it is the game's own layering.
+- CPU side, this session (2026-09-20). The lighting and fog table conversion is NEON now and
+  measures 200.24% against 198.56% at 1x. The emulation thread asks for display priority and
+  measures 201.62% against 199.29% at 1x; it was running at nice 0 while using 96% of a core on a
+  part with three classes of core. Neither shows at 2x or above, where the GPU is 99.9% busy.
+  Tried and reverted with numbers: cached upload memory 115.27% against 120.43% at 2x limit 200,
+  the Android performance hint interface 195.24% against 201.62% at 1x, texture descriptor set
+  reuse 196.07% against 198.56% at 1x, and direct vertex attribute field reads 198.86% against
+  200.24% at 1x. The staging copy that unified memory would remove is about 3% of the emulation
+  thread and was not taken, because it buys nothing above 1x and needs dirty tracking extended to
+  in-flight draws to stay correct.
+- Turnip flags closed (2026-09-20). At 3x against 63.73%: `noconform` 64.07%, `noconform,nouboopt`
+  64.31%, both inside the spread and both meaning a deliberately non-conformant driver. With
+  `gmem`, autotune, `noubwc` and `noconcurrentresolves` already measured, there is no remaining
+  switch; a Turnip change would have to be a patch to its compiler or render path.
