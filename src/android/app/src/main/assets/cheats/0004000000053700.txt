@@ -1,32 +1,69 @@
-[Thor Recommended - 30 FPS Low-End]
-D3000000 08000000
-00C26620 41F00000
-0019F390 000F812A
-00C2661C 42700000
-D2000000 00000000
+# E.X. Troopers (Japan, title 0004000000053700), and the Fan Translators International
+# English patch, which shares the title id.
+#
+# The patched build and the Japanese build have DIFFERENT addresses. Enable only the set that
+# matches the ROM you are running or the code writes into unrelated memory.
+#
+# Sourced from Reshiban/60FPS-AR-CHEATS-3DS, which carries a file per build:
+#   English patch: Cheats/E.X. Troopers (English Patched)/0004000000053700.txt (codes by @Hazerou)
+#   Japanese:      Cheats/E.X. Troopers (JPN)/0004000000053700.txt (codes by @NanashiFinal13)
+# All of the codes below were read from those two files rather than retyped from a summary.
+#
+# The game runs at 30 FPS by design. A 60 FPS code doubles the presentation rate and the AYN
+# Thor holds it at 2x with the Snapdragon GSR filter; see the bundled game profile.
 
-[60 FPS - English Patch Heavy]
-D3000000 08000000
-00C26620 42700000
-D2000000 00000000
+[60 FPS, hold R for 30 - English Patch]
+D3000000 00000000
+08C26620 42700000
+DD000000 00000100
+08C26620 41F00000
+D0000000 00000000
 
-[30 FPS Reset - English Patch]
-D3000000 08000000
-00C26620 41F00000
-D2000000 00000000
+[60 FPS - English Patch]
+08C26620 42700000
 
-[Low-End Speed Helper - English Patch]
-D3000000 08000000
-00C2661C 42700000
-D2000000 00000000
+[30 FPS - English Patch]
+08C26620 41F00000
+
+[Game Speed x2 - English Patch]
+08C2661C 42700000
+
+[Game Speed x1 - English Patch]
+08C2661C 41F00000
 
 [Disable AA - English Patch]
-D3000000 08000000
-0019F390 000F812A
-D2000000 00000000
+2819F390 0000002A
 
-[60 FPS - JPN Heavy]
+[Disable AA, second screen - English Patch]
+2819F391 00000081
+
+[No Dithering - English Patch]
+2819F392 0000000F
+
+[Trinity Disabler - English Patch]
+0819F390 000F812A
+
+[Default Rendering - English Patch]
+0819F390 001F416A
+
+[60 FPS, hold R for 30 - JPN]
+D3000000 00000000
 08C15270 42700000
+DD000000 00000100
+08C15270 41F00000
+D0000000 00000000
+
+[60 FPS - JPN]
+08C15270 42700000
+
+[30 FPS - JPN]
+08C15270 41F00000
+
+[Game Speed x2 - JPN]
+08C1526C 42700000
+
+[Game Speed x1 - JPN]
+08C1526C 41F00000
 
 [Disable AA - JPN]
 0818DFE0 001F412A
