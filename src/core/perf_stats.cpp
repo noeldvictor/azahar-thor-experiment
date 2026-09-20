@@ -21,6 +21,7 @@ using namespace std::chrono_literals;
 using DoubleSecs = std::chrono::duration<double, std::chrono::seconds::period>;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
+using std::chrono::nanoseconds;
 
 constexpr double FRAME_LENGTH = 1.0 / SCREEN_REFRESH_RATE;
 // Purposefully ignore the first five frames, as there's a significant amount of overhead in
@@ -269,19 +270,24 @@ void FrameLimiter::DoFrameLimiting(microseconds current_system_time_us) {
     // Max lag caused by slow frames. Shouldn't be more than the length of a frame at the current
     // speed percent or it will clamp too much and prevent this from properly limiting to that
     // percent. High values means it'll take longer after a slow frame to recover and start limiting
-    const microseconds max_lag_time_us = duration_cast<microseconds>(
-        std::chrono::duration<double, std::chrono::microseconds::period>(25ms / sleep_scale));
-    frame_limiting_delta_err += duration_cast<microseconds>(
-        std::chrono::duration<double, std::chrono::microseconds::period>(
+    // Keep the accumulator in nanoseconds. A microsecond accumulator truncated the emulated
+    // frame length, the elapsed walltime and the length of the sleep, and all three truncations
+    // pushed the same way: the limiter slept a little too long every frame, so a scene with
+    // headroom still read just under 100%. A 3DS frame is 16715.75 us, which a microsecond
+    // accumulator cannot even hold.
+    const nanoseconds max_lag_time = duration_cast<nanoseconds>(
+        std::chrono::duration<double, std::chrono::nanoseconds::period>(25ms / sleep_scale));
+    frame_limiting_delta_err += duration_cast<nanoseconds>(
+        std::chrono::duration<double, std::chrono::nanoseconds::period>(
             (current_system_time_us - previous_system_time_us) / sleep_scale));
-    frame_limiting_delta_err -= duration_cast<microseconds>(now - previous_walltime);
+    frame_limiting_delta_err -= duration_cast<nanoseconds>(now - previous_walltime);
     frame_limiting_delta_err =
-        std::clamp(frame_limiting_delta_err, -max_lag_time_us, max_lag_time_us);
+        std::clamp(frame_limiting_delta_err, -max_lag_time, max_lag_time);
 
-    if (frame_limiting_delta_err > microseconds::zero()) {
+    if (frame_limiting_delta_err > nanoseconds::zero()) {
         std::this_thread::sleep_for(frame_limiting_delta_err);
         auto now_after_sleep = Clock::now();
-        frame_limiting_delta_err -= duration_cast<microseconds>(now_after_sleep - now);
+        frame_limiting_delta_err -= duration_cast<nanoseconds>(now_after_sleep - now);
         now = now_after_sleep;
     }
 

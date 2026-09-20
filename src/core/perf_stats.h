@@ -209,8 +209,10 @@ private:
     /// Walltime at the last limiter invocation
     Clock::time_point previous_walltime = Clock::now();
 
-    /// Accumulated difference between walltime and emulated time
-    std::chrono::microseconds frame_limiting_delta_err{0};
+    /// Accumulated difference between walltime and emulated time. Nanoseconds, not
+    /// microseconds: a microsecond accumulator truncates three times per frame and every
+    /// truncation makes the limiter sleep longer, so every game ran a little under full speed.
+    std::chrono::nanoseconds frame_limiting_delta_err{0};
 
     /// Whether to use frame advancing (i.e. frame by frame)
     std::atomic_bool frame_advancing_enabled;

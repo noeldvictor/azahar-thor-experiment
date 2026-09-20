@@ -2041,3 +2041,17 @@
   full read and write of main memory. `rgba8_storage_usage` turns it off. At 3x it measures 61.70%
   off against 61.47% on, which is no change. The earlier reasoning that an a740 keeps UBWC with
   storage usage is now backed by a measurement.
+- The frame limiter slept a little too long, every frame, in every game (2026-09-19, fixed).
+  `FrameLimiter::DoFrameLimiting` kept its error accumulator in microseconds and truncated three
+  separate values into it: the emulated frame length, the elapsed walltime and the length of the
+  sleep it had just taken. `duration_cast` truncates toward zero, and all three truncations push
+  the same way, so the limiter slept longer than it meant to on every frame. A 3DS frame is
+  16715.75 us, which a microsecond accumulator cannot even hold. The accumulator is now
+  nanoseconds. In the snow field at 2x with the limit at 100 the reading moved from 99.91% over
+  six samples to 99.99% over twelve. The remainder is the noise of a sleep based limiter, which
+  cannot report exactly 100% over a finite window.
+- Keep the disk shader cache on. With it off, every new shader compiles during play, and a
+  compile stalls a frame hard enough that the limiter cannot make the time back. The bundled
+  profile for E.X. Troopers already had it on; a device copy left over from an earlier experiment
+  had it off, which cost a fraction of a percent. Check the device copy in `GameSettings/` before
+  trusting a reading, because it overrides the bundled file and is never overwritten.
