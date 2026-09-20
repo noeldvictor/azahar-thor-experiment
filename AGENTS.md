@@ -2342,3 +2342,15 @@
   frame, most of them blended, which is a colour read and a colour write each: 576 MB per frame
   before depth or textures, or roughly 22 GB/s at 38 frames per second against a part whose usable
   bandwidth is in the tens of GB/s. UBWC is already halving part of that and is worth 12%.
+- The colour cache is already at maximum on the direct path (2026-09-20). Blending bandwidth is
+  the measured wall, and the Adreno's CCU is the cache that would absorb it, so `emit_rb_ccu_cntl`
+  in `tu_cmd_buffer.cc` was read to see whether our Turnip build could give it more. It cannot:
+  for sysmem rendering Turnip already sets `color_cache_size = CCU_CACHE_SIZE_FULL`, so the CCU
+  occupies all of GMEM. There is no knob to turn. The targets are 4.7 MB at 3x against a GMEM of
+  a few MB, so a full screen blended pass cannot stay resident in it whatever the configuration.
+- How unusual this scene is (2026-09-20). The snow field runs 30 to 33 full screen passes per
+  frame into 768x1536 targets at 3x, carrying 72 million of its 75 million fragments, with 84% of
+  passes reading an earlier pass's output. That is a long post-processing chain, which suits the
+  game's comic-book look. A title that draws its scene once or twice per frame would shade well
+  under a tenth of this. Before concluding anything about the emulator from this scene, measure a
+  second title: these numbers are an outlier, not a baseline.
