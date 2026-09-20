@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.text.Editable
@@ -1827,6 +1828,13 @@ class EmulationFragment :
             when (state) {
                 State.STOPPED -> {
                     Thread({
+                        // This thread is the critical path of the frame and the only one that
+                        // has to keep pace with the guest. Android starts a plain Java thread at
+                        // the default priority, and on a heterogeneous ARM part that leaves the
+                        // scheduler free to park it on an efficiency core, which is roughly a
+                        // third of the throughput of a performance core. Asking for display
+                        // priority states what the thread is for.
+                        Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
                         Log.debug("[EmulationFragment] Starting emulation thread.")
                         NativeLibrary.run(gamePath)
                     }, "NativeEmulation").start()

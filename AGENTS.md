@@ -2188,3 +2188,21 @@
   the load with `eDontCare` needs proof that a pass fully overwrites its target, which the
   emulator cannot know before the draws arrive, so it does not help. Do not revisit tiling
   without first changing the pass structure itself.
+- The emulation thread now states its priority (2026-09-19, accepted). It was started as a plain
+  Java thread, so Android gave it the default priority: `top -H` showed priority 20 and nice 0
+  while it used 96% of a core, next to the audio thread at nice -16. On a heterogeneous ARM part
+  that leaves the scheduler free to place the one thread that must keep pace with the guest on an
+  efficiency core, which is roughly a third of the throughput of a performance core. Its affinity
+  mask was also observed changing between reads, 0x5f then 0xbf, so the placement really does move.
+  `Process.setThreadPriority(THREAD_PRIORITY_URGENT_DISPLAY)` at the top of the thread body puts
+  it at nice -8. Measured from save state 5 at 1x, where the frame is CPU bound: 201.62% against
+  199.29%. At 2x with the limit at 200 it is 120.05% against 120.52%, which is no change, because
+  the GPU is 99.9% busy there. Keep it: it costs nothing and it removes a real risk on a part with
+  three classes of core.
+- Still missing: the emulator never uses `PerformanceHintManager`, the Android API that tells the
+  scheduler a thread's frame deadline so it can pick the right core and clock. That is the proper
+  modern mechanism on this hardware and thread priority is only an approximation of it. Worth
+  doing, and it needs the frame deadline reported every frame from the emulation loop.
+- Geometry shaders are already handled. `Instance::UseGeometryShaders` returns false on Android
+  with a comment that they are extremely expensive on tilers, and the geometry path is expanded in
+  the vertex shader instead. Do not "fix" this by turning them on.
