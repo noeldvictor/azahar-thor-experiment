@@ -9508,3 +9508,20 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   are refused on this kernel; the software `cpu-clock` event samples at the same rate. The
   packaged library is stripped, so symbols must come from
   `src/android/app/build/intermediates/merged_native_libs/`.
+- Fragment depth write removed, accepted (2026-09-19). Measured in the snow field from save
+  state 5, six `perf_stats` samples per row, GPU clock 680 MHz in every sample, screenshots taken
+  from each run and identical. With `fixed_depth_range` off: 2x with the frame limit at 200 gives
+  103.40% speed and 16.15 ms; 3x at limit 100 gives 52.36% and 31.84 ms; 4x gives 31.07% and
+  53.72 ms. With it on: 114.24% and 14.63 ms; 61.52% and 27.20 ms; 37.78% and 44.51 ms. Both
+  halves ran on one build, so the comparison does not depend on a save state crossing builds.
+  The gain grows with resolution because the saving is per pixel: the early depth test now
+  rejects hidden pixels before the shader runs.
+- Resolution sweep of the snow field (2026-09-19). Emulated pixels per frame are 691,200 at 2x,
+  1,555,200 at 3x and 2,764,800 at 4x, counting both 3DS screens. Frame time is linear in that
+  count. Before the depth change the fit is 3.6 ms fixed plus 18.1 ns per pixel, and it predicts
+  the measured 3x within 0.03 ms. After the change it is 4.6 ms plus 14.6 ns per pixel, and it
+  predicted the measured 4x within 0.3 ms. The fixed part is what remains to be found: it does
+  not shrink with resolution, so it is per pass, per submission or per draw, not per pixel.
+- Tiled rendering remains worse than the direct path (2026-09-19, re-measured). `TU_DEBUG=gmem`
+  at 3x gives 46.94% speed against 52.36% for the default `sysmem`. The earlier result stands,
+  now taken with a verified snow field scene rather than a state that may have landed elsewhere.

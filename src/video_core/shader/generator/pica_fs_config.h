@@ -68,6 +68,11 @@ struct FramebufferConfig {
         BitField<6, 4, Pica::FramebufferRegs::LogicOp> logic_op;
         BitField<10, 1, u32> shadow_rendering;
         BitField<11, 1, u32> alphablend_enable;
+        /// Set when the viewport depth range applies the PICA depth transform, so the
+        /// shader must not write gl_FragDepth. Writing it turns off the early depth test
+        /// and the Adreno low resolution Z pass, which costs a full shader run for every
+        /// hidden pixel.
+        BitField<12, 1, u32> fixed_depth_range;
     };
     BlendConfig requested_rgb_blend{};
     BlendConfig requested_alpha_blend{};
@@ -77,7 +82,7 @@ struct FramebufferConfig {
     void ApplyProfile(const Profile& profile);
 
     static consteval u64 StructHash() {
-        constexpr u64 STRUCT_VERSION = 0;
+        constexpr u64 STRUCT_VERSION = 1;
 
         using T = FramebufferConfig;
         return Common::HashCombine(
@@ -89,6 +94,7 @@ struct FramebufferConfig {
             // fields
             FIELD_HASH(alpha_test_func), FIELD_HASH(scissor_test_mode), FIELD_HASH(depthmap_enable),
             FIELD_HASH(logic_op), FIELD_HASH(shadow_rendering), FIELD_HASH(alphablend_enable),
+            FIELD_HASH(fixed_depth_range),
             FIELD_HASH(requested_rgb_blend), FIELD_HASH(requested_alpha_blend),
             FIELD_HASH(requested_logic_op),
 

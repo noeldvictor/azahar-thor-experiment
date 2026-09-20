@@ -1929,3 +1929,31 @@
   the same frame. At 3x the frame is 32.0 ms with the GPU still 99.8% busy. A CPU-side change
   cannot raise the 2x result while the GPU stays saturated, and 200% at 2x needs the GPU work per
   frame roughly halved.
+- The PICA depth transform belongs in the viewport, not the fragment shader (2026-09-19,
+  accepted). Every generated fragment shader ended `WriteDepth` with a store to `gl_FragDepth`.
+  A shader that writes depth gives up the early depth test, and on Adreno it also gives up the
+  low resolution Z pass, so every hidden pixel still runs the whole shader. In a scene with
+  several layers of overdraw that multiplies the cost of every pixel. The transform is
+  `depth = -z_over_w * scale + offset`, which is affine in the interpolated depth, so a viewport
+  depth range of `[offset, offset - scale]` produces the identical value in fixed function.
+  `FramebufferConfig::fixed_depth_range` records the decision, the SPIR-V generator then
+  declares no depth output and no `DepthReplacing` execution mode, and the fog reads
+  `gl_FragCoord.z`, which now already holds the final value. W buffering divides by w as well,
+  which no viewport can express, so it keeps the shader write; so does a range that falls
+  outside 0 to 1. Snow field, save state 5, six samples each, GPU pinned at 680 MHz:
+
+  | resolution and limit | off | on | gain |
+  | --- | --- | --- | --- |
+  | 2x, frame limit 200 | 103.40% | 114.24% | +10.5% |
+  | 3x, frame limit 100 | 52.36% | 61.52% | +17.5% |
+  | 4x, frame limit 100 | 31.07% | 37.78% | +21.6% |
+
+  The picture is unchanged, including depth order. `fixed_depth_range` in the Utility settings
+  turns it off for comparison. Keep the two conditions in `pica_fs_config.cpp` and
+  `vk_rasterizer.cpp` identical; if they disagree the shader and the viewport apply different
+  transforms.
+- Cost model of the snow field (2026-09-19). GPU frame time fits
+  `3.6 ms + 18.1 ns per emulated pixel` before the depth change and
+  `4.6 ms + 14.6 ns per pixel` after it, across 2x, 3x and 4x, to better than half a millisecond.
+  Use it to predict a change: a per-pixel saving helps most at 4x, and a fixed saving helps most
+  at 2x. The GPU stays 99.8% busy in every row, so a CPU-side change cannot move these numbers.

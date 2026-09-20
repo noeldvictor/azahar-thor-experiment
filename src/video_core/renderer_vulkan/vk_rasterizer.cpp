@@ -860,6 +860,22 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     };
     pipeline_info.dynamic_info.scissor = draw_rect;
 
+    // Put the PICA depth transform in the viewport depth range when it fits there. The shader
+    // then writes no depth, which keeps the early depth test and the low resolution Z pass.
+    // The condition must match FramebufferConfig, or the shader and the viewport disagree.
+    const float depth_scale = Pica::f24::FromRaw(regs.rasterizer.viewport_depth_range).ToFloat32();
+    const float depth_offset =
+        Pica::f24::FromRaw(regs.rasterizer.viewport_depth_near_plane).ToFloat32();
+    const float range_min = depth_offset;
+    const float range_max = depth_offset - depth_scale;
+    const bool range_is_legal =
+        range_min >= 0.f && range_min <= 1.f && range_max >= 0.f && range_max <= 1.f;
+    const bool use_fixed_range =
+        Settings::values.fixed_depth_range.GetValue() && range_is_legal &&
+        regs.rasterizer.depthmap_enable == Pica::RasterizerRegs::DepthBuffering::ZBuffering;
+    pipeline_info.dynamic_info.min_depth = use_fixed_range ? range_min : 0.f;
+    pipeline_info.dynamic_info.max_depth = use_fixed_range ? range_max : 1.f;
+
     // Draw the vertex batch
     bool succeeded = true;
     VideoCore::ScopedFrameProfileTimer submit_timer{

@@ -30,9 +30,9 @@ Settings**, and their file is never overwritten by an update.
 Keep `docs/thor-optimization-notes.md` and `AGENTS.md` current when a bundled profile changes.
 
 - `0004000000053700.ini` - E.X. Troopers: 2x resolution, custom textures off, normal frame limit,
-  and the texture-copy fallback skip enabled for smoother Thor play. Validated on 2026-09-19 in
-  the snow field, the heaviest scene found: 2x holds 95 to 97% speed; 3x reaches about 51% and
-  4x about 26%, both limited by the GPU. Keep this profile at 2x until the render path gets
-  cheaper.
+  and the texture-copy fallback skip enabled for smoother Thor play. Re-measured on 2026-09-19 in
+  the snow field, the heaviest scene found, after the fragment depth write was removed: 2x holds
+  full speed and reaches 114% in fast forward, 3x reaches 61.5% and 4x 37.8%, both still limited
+  by the GPU. Keep this profile at 2x until the render path gets cheaper.
 - `0004000000112C00.ini` - Conception II: 5x resolution so both Thor panels downscale instead of
   stretching, Anime4K texture filter off, Snapdragon GSR screen filter.

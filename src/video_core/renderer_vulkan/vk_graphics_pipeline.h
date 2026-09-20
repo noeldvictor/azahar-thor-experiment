@@ -271,6 +271,9 @@ struct DynamicPipelineInfo {
 
     Common::Rectangle<u32> scissor;
     Common::Rectangle<s32> viewport;
+    /// The PICA depth transform, moved out of the fragment shader into fixed function.
+    float min_depth = 0.f;
+    float max_depth = 1.f;
 
     bool operator==(const DynamicPipelineInfo& other) const noexcept {
         return std::memcmp(this, &other, sizeof(DynamicPipelineInfo)) == 0;

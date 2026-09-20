@@ -650,6 +650,12 @@ struct Values {
     /// build does not restore into another.
     Setting<bool> fast_fragment_lighting{true, Keys::fast_fragment_lighting};
 
+    /// Puts the PICA depth transform in the viewport depth range instead of writing
+    /// gl_FragDepth from the fragment shader. A shader that writes depth gives up the
+    /// early depth test and, on Adreno, the low resolution Z pass, so every hidden pixel
+    /// still runs the whole shader. The image is the same. Turn it off to compare.
+    Setting<bool> fixed_depth_range{true, Keys::fixed_depth_range};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

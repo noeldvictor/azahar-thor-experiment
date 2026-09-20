@@ -329,6 +329,7 @@ void Config::ReadValues() {
     // declared keeps its built-in default on Android, and the ini value is ignored in silence.
     ReadSetting("Utility", Settings::values.allow_savestate_mismatch);
     ReadSetting("Utility", Settings::values.fast_fragment_lighting);
+    ReadSetting("Utility", Settings::values.fixed_depth_range);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

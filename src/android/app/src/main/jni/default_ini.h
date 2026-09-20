@@ -421,6 +421,12 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 0: Off, 1 (default): On
 )") DECLARE_KEY(fast_fragment_lighting) BOOST_HANA_STRING(R"(
 
+# Puts the PICA depth transform in the viewport depth range instead of writing gl_FragDepth
+# from the fragment shader. A shader that writes depth gives up the early depth test, so
+# every hidden pixel still runs the whole shader. Same image either way.
+# 0: Off, 1 (default): On
+)") DECLARE_KEY(fixed_depth_range) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

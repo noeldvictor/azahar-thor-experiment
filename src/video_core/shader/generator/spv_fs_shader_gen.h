@@ -224,6 +224,9 @@ private:
     const Profile& profile;
 
     bool use_fragment_shader_barycentric{};
+    /// False when the viewport depth range applies the PICA depth transform. The shader
+    /// then declares no depth output at all, which keeps the early depth test alive.
+    bool writes_depth{true};
 
     Id void_id{};
     Id bool_id{};

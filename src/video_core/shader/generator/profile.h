@@ -34,6 +34,9 @@ struct Profile {
     u8 has_blend_minmax_factor{};
     u8 has_minus_one_to_one_range{};
     u8 has_logic_op{};
+    /// The backend can put the PICA depth transform in the viewport depth range, so the
+    /// fragment shader does not have to write gl_FragDepth.
+    u8 has_fixed_depth_range{};
 
     u8 has_gl_ext_framebuffer_fetch{};
     u8 has_gl_arm_framebuffer_fetch{};

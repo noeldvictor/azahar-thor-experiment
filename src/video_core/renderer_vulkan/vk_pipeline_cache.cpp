@@ -108,6 +108,7 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
         .has_blend_minmax_factor = false,
         .has_minus_one_to_one_range = false,
         .has_logic_op = !instance.NeedsLogicOpEmulation(),
+        .has_fixed_depth_range = Settings::values.fixed_depth_range.GetValue(),
         .vk_disable_spirv_optimizer = Settings::values.disable_spirv_optimizer.GetValue(),
         .vk_use_spirv_generator = Settings::values.spirv_shader_gen.GetValue(),
         .is_vulkan = true,
@@ -386,14 +387,17 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
                       current_depth_stencil = current_info.state.depth_stencil,
                       rasterization = info.state.rasterization,
                       depth_stencil = info.state.depth_stencil](vk::CommandBuffer cmdbuf) {
-        if (dynamic.viewport != current_dynamic.viewport || is_dirty) {
+        // The depth range is part of the viewport, so a change to it must resend the viewport.
+        if (dynamic.viewport != current_dynamic.viewport ||
+            dynamic.min_depth != current_dynamic.min_depth ||
+            dynamic.max_depth != current_dynamic.max_depth || is_dirty) {
             const vk::Viewport vk_viewport = {
                 .x = static_cast<f32>(dynamic.viewport.left),
                 .y = static_cast<f32>(dynamic.viewport.top),
                 .width = static_cast<f32>(dynamic.viewport.GetWidth()),
                 .height = static_cast<f32>(dynamic.viewport.GetHeight()),
-                .minDepth = 0.f,
-                .maxDepth = 1.f,
+                .minDepth = dynamic.min_depth,
+                .maxDepth = dynamic.max_depth,
             };
             cmdbuf.setViewport(0, vk_viewport);
         }

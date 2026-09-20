@@ -2,6 +2,7 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include "video_core/pica_types.h"
 #include "video_core/shader/generator/pica_fs_config.h"
 
 namespace Pica::Shader {
@@ -20,6 +21,21 @@ FramebufferConfig::FramebufferConfig(const Pica::RegsInternal& regs) {
 
     logic_op.Assign(Pica::FramebufferRegs::LogicOp::Copy);
 
+    // The PICA depth transform is depth = -z_over_w * scale + offset, which is affine in the
+    // interpolated depth. A viewport depth range of [offset, offset - scale] produces exactly
+    // the same value in fixed function, so the shader does not need to write gl_FragDepth.
+    // W buffering divides by w as well, which no viewport can express, so it keeps the write.
+    const float depth_scale = Pica::f24::FromRaw(regs.rasterizer.viewport_depth_range).ToFloat32();
+    const float depth_offset =
+        Pica::f24::FromRaw(regs.rasterizer.viewport_depth_near_plane).ToFloat32();
+    const float range_min = depth_offset;
+    const float range_max = depth_offset - depth_scale;
+    const bool range_is_legal = range_min >= 0.f && range_min <= 1.f && range_max >= 0.f &&
+                                range_max <= 1.f;
+    fixed_depth_range.Assign(
+        regs.rasterizer.depthmap_enable == Pica::RasterizerRegs::DepthBuffering::ZBuffering &&
+        range_is_legal);
+
     if (alphablend_enable) {
         requested_rgb_blend.eq = output_merger.alpha_blending.blend_equation_rgb.Value();
         requested_rgb_blend.src_factor = output_merger.alpha_blending.factor_source_rgb;
@@ -32,6 +48,10 @@ FramebufferConfig::FramebufferConfig(const Pica::RegsInternal& regs) {
 }
 
 void FramebufferConfig::ApplyProfile(const Profile& profile) {
+    // Only a backend that sets the viewport depth range may drop the depth write.
+    if (!profile.has_fixed_depth_range) {
+        fixed_depth_range.Assign(0);
+    }
     // Emulate logic op in the shader if needed and not supported.
     if (!profile.has_logic_op && !alphablend_enable) {
         logic_op.Assign(requested_logic_op);
