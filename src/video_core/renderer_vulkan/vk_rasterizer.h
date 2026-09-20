@@ -162,12 +162,18 @@ private:
     void ReloadShadingRules();
     u8 ShadingRateForShader(u64 fs_hash) const;
     void NoteShaderUse(u64 fs_hash, u8 rate);
+    /// Is this draw identical to the one before it? A scene that replays the same batch is a
+    /// port or emulation fault; a scene that simply has many distinct batches is the game.
+    void NoteDrawIdentity(u64 fs_hash, u32 vertices, u32 base_address, u32 vertex_offset);
     void ReportShaderUse();
     std::string shading_rules_text{"ÿ"};
     std::unordered_map<u64, u8> shading_rules;
     // hash -> {draws, draws that got a coarse rate}. Recording the last rate seen
     // instead of counting hid that one shader serves both coarse and sharp draws.
     std::unordered_map<u64, std::pair<u32, u32>> shader_use;
+    u64 prev_draw_key{~0ull};
+    u32 repeat_draws{}, total_ident_draws{};
+    std::array<u32, 6> vertex_buckets{};
     PAddr pass_color_addr{};
     PAddr pass_depth_addr{};
     bool geometry_expand_draw{};

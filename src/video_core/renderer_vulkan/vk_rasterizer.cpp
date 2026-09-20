@@ -886,6 +886,9 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
             }
         }
         NoteShaderUse(fs_hash, rate);
+        NoteDrawIdentity(fs_hash, regs.pipeline.num_vertices,
+                         regs.pipeline.vertex_attributes.GetPhysicalBaseAddress(),
+                         regs.pipeline.vertex_offset);
     }
     pipeline_info.dynamic_info.shading_rate_width = rate;
     pipeline_info.dynamic_info.shading_rate_height = rate;
@@ -1020,6 +1023,27 @@ void RasterizerVulkan::NoteShaderUse(u64 fs_hash, u8 rate) {
 #endif
 }
 
+void RasterizerVulkan::NoteDrawIdentity(u64 fs_hash, u32 vertices, u32 base_address,
+                                        u32 vertex_offset) {
+#if THOR_FRAME_PROFILING
+    total_ident_draws++;
+    const u64 key = fs_hash ^ (static_cast<u64>(vertices) << 1) ^
+                    (static_cast<u64>(base_address) << 17) ^
+                    (static_cast<u64>(vertex_offset) << 41);
+    if (key == prev_draw_key) {
+        repeat_draws++;
+    }
+    prev_draw_key = key;
+    const std::size_t bucket = vertices <= 8      ? 0
+                               : vertices <= 32   ? 1
+                               : vertices <= 128  ? 2
+                               : vertices <= 512  ? 3
+                               : vertices <= 2048 ? 4
+                                                  : 5;
+    vertex_buckets[bucket]++;
+#endif
+}
+
 void RasterizerVulkan::ReportShaderUse() {
 #if THOR_FRAME_PROFILING
     // The shaders the frame actually spends its draws on, most used first, with the rate each
@@ -1039,6 +1063,14 @@ void RasterizerVulkan::ReportShaderUse() {
         top += fmt::format("{:016X}:{}draws/{}coarse ", sorted[i].first, sorted[i].second.first,
                            sorted[i].second.second);
     }
+    LOG_INFO(Render_Vulkan,
+             "ThorDrawIdentity draws={} repeats_of_previous={} verts_le8={} le32={} le128={} "
+             "le512={} le2048={} gt2048={}",
+             total_ident_draws, repeat_draws, vertex_buckets[0], vertex_buckets[1],
+             vertex_buckets[2], vertex_buckets[3], vertex_buckets[4], vertex_buckets[5]);
+    total_ident_draws = 0;
+    repeat_draws = 0;
+    vertex_buckets = {};
     LOG_INFO(Render_Vulkan, "ThorShaderUse shaders={} {}", sorted.size(), top);
     // Every shader that got a coarse rate, not just the ones with the most draws. A full screen
     // sheet is a handful of draws, so ranking by draw count hides exactly the shaders that

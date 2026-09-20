@@ -2579,3 +2579,21 @@
   is not yet isolated. Do that first; it is a bounded bisection with a screenshot each round.
   The real work in the mechanism is depth: a half size effect buffer needs a downsampled depth
   buffer to test against, since 1650 of the 1800 draws use depth.
+- Three ways the 1800 draws could have been our fault, all tested and none of them true
+  (2026-09-20). The count is high enough to be suspicious, so it was worth attacking rather than
+  asserting.
+  **Replay**: `ThorDrawIdentity draws=134686 repeats_of_previous=9730`, so only 7.2% of draws
+  repeat the previous draw's shader, vertex count, buffer address and offset. Nothing is being
+  re-issued. **Stereo**: `disable_right_eye_render` true against false gives 1839.6 draws a frame
+  and about 75.1 million fragments either way, identical, so the game is not submitting two eyes.
+  **Software fallback splitting batches**: `accelerated_pct=100.00 software=0`, and the 57
+  geometry-expanded draws a frame are inside the 1846 rather than added to it.
+  The vertex histogram settles what the draws are: 12.2% have at most 8 vertices, 5.0% at most
+  32, 21.1% at most 128, 39.4% at most 512, 18.3% at most 2048 and 3.9% more. That is the shape of
+  real geometry with a large population of single sprite quads, which is the blizzard, not the
+  shape of a batching failure.
+  Why a 3DS can afford it: the ARM11 builds a command list and the GPU replays it, so a draw is
+  nearly free on the console. We pay per draw on translation, which is why `gpu_cmd` is about
+  7 ms. That cost is real and is worth attacking, but it is not this scene's wall: `swap` is
+  13 ms against `gpu_cmd` 7 ms at 3x, so the GPU is the constraint and halving the draw count
+  would not change the fragment count or the blending behind it.
