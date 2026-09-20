@@ -313,6 +313,34 @@ class GameAdapter(
         )
     }
 
+    /**
+     * Show what this fork has learned about a title: recommended settings, measured numbers and
+     * known issues. Notes live in GameNotes/<title id>.md in the user folder and are seeded from
+     * the APK on first run, so a note can be edited on the device and is never overwritten.
+     */
+    private fun showGameNotes(context: android.content.Context, game: Game) {
+        val titleId = String.format("%016X", game.titleId)
+        val path = "/config/GameNotes/$titleId.md"
+        val text = try {
+            val tree = CitraApplication.documentsTree
+            if (tree.exists(path)) {
+                context.contentResolver.openInputStream(tree.getUri(path))?.use { input ->
+                    input.readBytes().toString(Charsets.UTF_8)
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.error("[GameAdapter] Failed to read notes for $titleId: ${e.message}")
+            null
+        }
+        MaterialAlertDialogBuilder(context)
+            .setTitle(game.title)
+            .setMessage(text?.takeIf { it.isNotBlank() } ?: context.getString(R.string.game_notes_none))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
     private fun showOpenContextMenu(view: View, game: Game) {
         val dirs = getGameDirectories(game)
 
@@ -786,6 +814,11 @@ class GameAdapter(
             R.id.menu_button_uninstall
         ).setOnClickListener {
             showUninstallContextMenu(it, game, bottomSheetDialog)
+        }
+
+        bottomSheetView.findViewById<MaterialButton>(R.id.game_notes).setOnClickListener {
+            showGameNotes(context, holder.game)
+            bottomSheetDialog.dismiss()
         }
 
         bottomSheetView.findViewById<MaterialButton>(R.id.manage_cache).setOnClickListener {

@@ -26,6 +26,8 @@ object DirectoryInitialization {
     private const val GAME_SETTINGS_DIR = "GameSettings"
     private const val BUNDLED_SHADER_RULES_DIR = "shader_rules"
     private const val SHADER_RULES_DIR = "config/ShaderRules"
+    private const val BUNDLED_GAME_NOTES_DIR = "game_notes"
+    private const val GAME_NOTES_DIR = "config/GameNotes"
     private const val SYS_DIR_VERSION = "sysDirectoryVersion"
     private val REPLACEABLE_BUNDLED_CHEAT_SIZES = mapOf(
         "0004000000086300.txt" to 5076L,
@@ -57,6 +59,7 @@ object DirectoryInitialization {
                     installBundledCheats()
                     installBundledGameSettings()
                     installBundledShaderRules()
+                    installBundledGameNotes()
                     GpuDriverHelper.initializeDriverParameters()
                     BundledGpuDriver.installIfNeeded(context)
                     DirectoryInitializationState.CITRA_DIRECTORIES_INITIALIZED
@@ -180,6 +183,55 @@ object DirectoryInitialization {
      * seeded: a file the user already has is never overwritten, so an edited rule set wins over
      * the bundled one and deleting a file restores the untouched picture.
      */
+    /**
+     * Seed the per-title notes shown from the game's bottom sheet. Same contract as the other
+     * bundled assets: a file the user already has is never overwritten, so an edited note wins.
+     */
+    private fun installBundledGameNotes() {
+        val notes = try {
+            context.assets.list(BUNDLED_GAME_NOTES_DIR) ?: return
+        } catch (e: IOException) {
+            Log.error("[DirectoryInitialization] Failed to list bundled game notes: ${e.message}")
+            return
+        }
+        val noteFiles = notes.filter { it.endsWith(".md", ignoreCase = true) }
+        if (noteFiles.isEmpty()) {
+            return
+        }
+        val tree = CitraApplication.documentsTree
+        if (tree.folderUriHelper("/$GAME_NOTES_DIR/", true) == null) {
+            Log.warning("[DirectoryInitialization] Failed to create $GAME_NOTES_DIR directory")
+            return
+        }
+        for (filename in noteFiles) {
+            val destinationPath = "/$GAME_NOTES_DIR/$filename"
+            try {
+                if (tree.exists(destinationPath)) {
+                    continue
+                }
+                if (!tree.createFile("/$GAME_NOTES_DIR/", filename)) {
+                    Log.warning("[DirectoryInitialization] Failed to create $destinationPath")
+                    continue
+                }
+                context.assets.open("$BUNDLED_GAME_NOTES_DIR/$filename").use { input ->
+                    context.contentResolver.openOutputStream(tree.getUri(destinationPath), "wt")
+                        .use { output ->
+                            if (output == null) {
+                                Log.warning("[DirectoryInitialization] Failed to open $destinationPath")
+                            } else {
+                                copyFile(input, output)
+                            }
+                        }
+                }
+            } catch (e: Exception) {
+                Log.error(
+                    "[DirectoryInitialization] Failed to install bundled game notes $filename: " +
+                        e.message
+                )
+            }
+        }
+    }
+
     private fun installBundledShaderRules() {
         val rules = try {
             context.assets.list(BUNDLED_SHADER_RULES_DIR) ?: return

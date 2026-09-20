@@ -220,6 +220,15 @@
                 android:text="@string/game_settings" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/game_notes"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@string/game_notes"
+                android:text="@string/game_notes" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/manage_cache"
                 style="@style/Widget.Material3.Button.TonalButton.Icon"
                 android:layout_width="wrap_content"

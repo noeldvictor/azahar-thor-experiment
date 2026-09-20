@@ -284,6 +284,10 @@
     <string name="linear_filtering">Linear Filtering</string>
     <string name="linear_filtering_description">Enables linear filtering, which causes game visuals to appear smoother.</string>
     <string name="screen_filter_name">Screen Filter</string>
+    <string name="game_notes">Notes</string>
+    <string name="game_notes_none">No notes for this title yet.
+
+Notes live in config/GameNotes/&lt;title id&gt;.md in the user folder. Create that file to keep your own settings and findings for a game, and it will show here.</string>
     <string name="sgsr_sharpness_name">GSR Sharpness</string>
     <string name="sgsr_sharpness_description">How hard Snapdragon GSR sharpens edges, as a percentage of Qualcomm&#8217;s reference value. 0 leaves plain upscaling with no sharpening, 100 is the reference, and higher values sharpen more and eventually ring on high-contrast edges. Only applies while the Screen Filter is Snapdragon GSR and a screen is being upscaled.</string>
     <string name="blended_shading_rate_name">Coarse Effect Shading</string>
