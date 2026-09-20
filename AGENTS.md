@@ -2055,3 +2055,13 @@
   profile for E.X. Troopers already had it on; a device copy left over from an earlier experiment
   had it off, which cost a fraction of a percent. Check the device copy in `GameSettings/` before
   trusting a reading, because it overrides the bundled file and is never overwritten.
+- Reusing the texture descriptor set between draws does not pay (2026-09-19, implemented,
+  measured, reverted). `SyncTextureUnits` takes a fresh set from the heap for every draw and
+  writes the same three image and sampler pairs into it, about 1,800 times per frame, and the
+  heap holds 1,024 sets so it wraps several times per frame. Binding the previous set again when
+  the three pairs are unchanged renders correctly and the picture is identical, but it is not
+  faster: at 1x, where the frame is CPU bound, 196.07% against 198.56% without it, and at 2x with
+  the limit at 200, 115.26% against 114.99%. Building and comparing the key costs what the skipped
+  writes save, and the surface and sampler lookups still run for every draw either way. Reverted.
+  If this is tried again, the saving has to come from skipping `GetTextureSurface` as well, and
+  that changes when surfaces are validated against guest memory.
