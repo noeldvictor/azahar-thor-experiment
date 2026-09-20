@@ -2295,3 +2295,15 @@
   only ever tried while chasing relaxed precision, never measured for speed. Turning the optimizer
   off gives 64.01% at 3x against 63.73% with it on, inside the spread. Mesa's own compiler
   produces equivalent code either way, so leave the optimizer on and do not revisit this.
+- Why the desktop render pass model and this tiler collide, with the number (2026-09-20). A render
+  pass costs 25.2 us in tiled mode and 5.4 us on the direct path, measured the same way in both:
+  at 1x with `pass_restart_every` set to 8, the frame goes from 8.26 to 14.08 ms under
+  `TU_DEBUG=gmem` against 8.42 to 9.66 ms under `sysmem`, for about 231 extra passes either way.
+  At the 95 passes the snow field runs, tiling pays 2.39 ms of pass overhead per frame against
+  0.51 ms for the direct path, so 1.9 ms of tiling's deficit is the pass count alone before any
+  tile load or store is counted.
+  That is the shape of the problem: Azahar renders each 3DS pass as its own Vulkan pass, which is
+  correct on a desktop GPU and expensive on a tiler, so the fork forces the direct path and gives
+  up the tile buffer that would have absorbed the blended overdraw for free. Cutting the pass
+  count is what would let tiling pay, and only then. Fixing either half alone does nothing, which
+  is why every single-change experiment in this ledger has come back small.
