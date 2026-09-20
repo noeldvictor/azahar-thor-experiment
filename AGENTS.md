@@ -2279,3 +2279,15 @@
   100.02% down to 99.86%, is run to run noise and not heat. The `thermals` tool in the MCP server
   returns all of this; call it either side of a measurement, because a CPU cap can fall while the
   GPU clock still looks correct, and the GPU clock alone is what the goal checks.
+- Fragment count scales with resolution, and the GPU gets more efficient as it rises
+  (2026-09-20). The snow field runs 32.88 million fragment invocations per frame at 2x and 137.92
+  million at 4x, a 4.19 times rise against a 4.0 times area increase, so overdraw is resolution
+  independent and nothing degrades at higher scale. The pass shape is the same at both, 30 or 31
+  large passes carrying 95% of the work.
+  Counted throughput, however, is 2.37 Gpix per second at 2x and 3.09 at 4x, so the part looks
+  30% more efficient at the higher resolution. That is the signature of helper lanes: a fragment
+  shader runs in 2x2 quads, a partially covered quad still costs its full width, and the counter
+  does not include the helper invocations. At 2x the triangles are smaller in pixels, so more of
+  the real work is helpers that never appear in the count. It is a property of the content at
+  that scale, not something the emulator can reclaim, and it is why per-pixel cost falls from
+  21.1 to 16.1 ns as resolution rises.
