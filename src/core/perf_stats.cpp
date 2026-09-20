@@ -277,12 +277,20 @@ void FrameLimiter::DoFrameLimiting(microseconds current_system_time_us) {
     // accumulator cannot even hold.
     const nanoseconds max_lag_time = duration_cast<nanoseconds>(
         std::chrono::duration<double, std::chrono::nanoseconds::period>(25ms / sleep_scale));
+    // The two sides of the clamp do different jobs, so they are not the same size. The positive
+    // side bounds how long one sleep can be, and 25 ms is right for that. The negative side
+    // records time the emulator still owes after a frame ran long, and clamping that to 25 ms
+    // threw the debt away: one frame that overruns by more than a frame and a half is never paid
+    // back, so a scene with headroom still settles just under full speed. Four frames of debt is
+    // enough to pay back an ordinary hitch, and still bounds catching up to a fraction of a
+    // second after a real stall.
+    const nanoseconds max_debt_time = max_lag_time * 4;
     frame_limiting_delta_err += duration_cast<nanoseconds>(
         std::chrono::duration<double, std::chrono::nanoseconds::period>(
             (current_system_time_us - previous_system_time_us) / sleep_scale));
     frame_limiting_delta_err -= duration_cast<nanoseconds>(now - previous_walltime);
     frame_limiting_delta_err =
-        std::clamp(frame_limiting_delta_err, -max_lag_time, max_lag_time);
+        std::clamp(frame_limiting_delta_err, -max_debt_time, max_lag_time);
 
     if (frame_limiting_delta_err > nanoseconds::zero()) {
         std::this_thread::sleep_for(frame_limiting_delta_err);

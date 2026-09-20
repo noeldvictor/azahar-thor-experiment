@@ -2065,3 +2065,12 @@
   writes save, and the surface and sampler lookups still run for every draw either way. Reverted.
   If this is tried again, the saving has to come from skipping `GetTextureSurface` as well, and
   that changes when surfaces are validated against guest memory.
+- The frame limiter threw away time it owed (2026-09-19, fixed). The error accumulator was
+  clamped to the same 25 ms on both sides, but the two sides do different jobs. The positive side
+  bounds how long one sleep can be, where 25 ms is right. The negative side records time the
+  emulator still owes after a frame ran long, and clamping that to 25 ms means a single frame
+  that overruns by more than a frame and a half is never paid back, so a scene with headroom
+  settles a little under full speed for good. The debt bound is now four frames. Snow field at 2x
+  with the limit at 100: 99.95% before, 99.99% after, over twelve samples each. Together with the
+  nanosecond accumulator this took the reading from 99.91% to 99.99%. What is left is the noise
+  of a sleep based limiter, which targets exactly 100% and so cannot report above it on average.
