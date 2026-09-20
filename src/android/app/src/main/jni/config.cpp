@@ -331,6 +331,7 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.fast_fragment_lighting);
     ReadSetting("Utility", Settings::values.fixed_depth_range);
     ReadSetting("Utility", Settings::values.skip_pass_barriers);
+    ReadSetting("Utility", Settings::values.cache_texture_samples);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

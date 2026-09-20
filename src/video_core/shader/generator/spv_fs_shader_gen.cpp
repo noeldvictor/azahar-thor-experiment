@@ -26,6 +26,7 @@ FragmentModule::FragmentModule(const FSConfig& config_, const Profile& profile_)
     // ApplyProfile decides whether the backend can take the depth transform, so read the
     // answer after it runs and before any interface is defined.
     writes_depth = !config.framebuffer.fixed_depth_range;
+    cache_texture_samples = Settings::values.cache_texture_samples.GetValue();
     DefineArithmeticTypes();
     DefineUniformStructs();
     DefineInterface();
@@ -242,8 +243,7 @@ void FragmentModule::WriteLighting() {
 
     // Compute fragment normals and tangents
     const auto perturbation = [&]() -> Id {
-        const Id texel{
-            OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[lighting.bump_selector])};
+        const Id texel{SampleTexUnit(lighting.bump_selector)};
         const Id texel_rgb{OpVectorShuffle(vec_ids.Get(3), texel, texel, 0, 1, 2)};
         const Id rgb_mul_two{OpVectorTimesScalar(vec_ids.Get(3), texel_rgb, ConstF32(2.f))};
         return OpFSub(vec_ids.Get(3), rgb_mul_two, ConstF32(1.f, 1.f, 1.f));
@@ -341,7 +341,7 @@ void FragmentModule::WriteLighting() {
 
     Id shadow{ConstF32(1.f, 1.f, 1.f, 1.f)};
     if (lighting.enable_shadow) {
-        shadow = OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[lighting.shadow_selector]);
+        shadow = SampleTexUnit(lighting.shadow_selector);
         if (lighting.shadow_invert) {
             shadow = OpFSub(vec_ids.Get(4), ConstF32(1.f, 1.f, 1.f, 1.f), shadow);
         }
@@ -1323,6 +1323,20 @@ Id FragmentModule::LookupLightingLUT(Id lut_index, Id index, Id delta) {
     return OpFma(f32_id, entry_g, delta, entry_r);
 }
 
+Id FragmentModule::SampleTexUnit(u32 unit) {
+    // The generator emits straight-line code here: the only branches it makes are a kill and its
+    // merge block, and generation continues in that merge block. So a sample emitted earlier
+    // always dominates a later use, and one fetch per unit is enough.
+    if (!cache_texture_samples) {
+        return OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[unit]);
+    }
+    if (!has_sampled_tex_unit[unit]) {
+        sampled_tex_unit[unit] = OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[unit]);
+        has_sampled_tex_unit[unit] = true;
+    }
+    return sampled_tex_unit[unit];
+}
+
 Id FragmentModule::GetSource(TevStageConfig::Source source, s32 index) {
     using Source = TevStageConfig::Source;
     switch (source) {
@@ -1333,13 +1347,13 @@ Id FragmentModule::GetSource(TevStageConfig::Source source, s32 index) {
     case Source::SecondaryFragmentColor:
         return secondary_fragment_color;
     case Source::Texture0:
-        return OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[0]);
+        return SampleTexUnit(0);
     case Source::Texture1:
-        return OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[1]);
+        return SampleTexUnit(1);
     case Source::Texture2:
-        return OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[2]);
+        return SampleTexUnit(2);
     case Source::Texture3:
-        return OpFunctionCall(vec_ids.Get(4), sample_tex_unit_func[3]);
+        return SampleTexUnit(3);
     case Source::PreviousBuffer:
         return combiner_buffer;
     case Source::Constant:

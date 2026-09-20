@@ -9525,3 +9525,17 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
 - Tiled rendering remains worse than the direct path (2026-09-19, re-measured). `TU_DEBUG=gmem`
   at 3x gives 46.94% speed against 52.36% for the default `sysmem`. The earlier result stands,
   now taken with a verified snow field scene rather than a state that may have landed elsewhere.
+- Goal status after the depth change (2026-09-19, final build of the session). Snow field from
+  save state 5, six `perf_stats` samples per row, screenshot taken from each run and checked to be
+  the snow field, GPU clock 680 MHz in every sample so no row is void.
+
+  | resolution | frame limit | speed | game FPS | frame ms | GPU busy | target | met |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 2x | 100 | 99.90% | 59.67 | 13.03 | 91.4% | 100% | yes, and the limiter is the cap |
+  | 2x | 200 | 114.99% | 68.81 | 14.55 | 99.8% | 200% | no |
+  | 3x | 100 | 61.47% | 36.93 | 27.17 | 99.9% | 100% | no |
+  | 4x | 100 | 37.58% | 22.32 | 44.63 | 99.9% | 100% | no |
+
+  The 2x row at limit 100 sits a tenth of a percent under 100% because the frame limiter cannot
+  exceed its own target; the GPU is only 91.4% busy there, and the same scene reaches 114.99%
+  once the limit is raised, so the headroom is real.

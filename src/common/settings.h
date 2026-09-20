@@ -663,6 +663,12 @@ struct Values {
     /// off unless you are taking that measurement.
     Setting<bool> skip_pass_barriers{false, Keys::skip_pass_barriers};
 
+    /// Samples each texture unit once per fragment instead of once per reference. A
+    /// combiner stage asks for the same unit from both the colour and the alpha side, and
+    /// several stages ask for the same unit, so the shader used to fetch it many times
+    /// over. The value is the same every time. Turn it off to compare.
+    Setting<bool> cache_texture_samples{true, Keys::cache_texture_samples};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

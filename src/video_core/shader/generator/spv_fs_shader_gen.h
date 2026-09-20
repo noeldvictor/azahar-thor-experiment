@@ -102,6 +102,9 @@ private:
     /// Returns the specified TEV stage source component(s)
     [[nodiscard]] Id GetSource(Pica::TexturingRegs::TevStageConfig::Source source, s32 index);
 
+    /// Samples a texture unit, reusing the value if this fragment already sampled it.
+    [[nodiscard]] Id SampleTexUnit(u32 unit);
+
     /// Writes the color components to use for the specified TEV stage color modifier
     [[nodiscard]] Id AppendColorModifier(
         Pica::TexturingRegs::TevStageConfig::ColorModifier modifier,
@@ -285,6 +288,12 @@ private:
     Id alpha_results_3{};
 
     Id sample_tex_unit_func[NUM_TEX_UNITS]{};
+    /// One sample per texture unit per fragment. The combiner asks for the same unit from
+    /// several stages and from both the colour and the alpha side, and each ask used to
+    /// emit another fetch.
+    Id sampled_tex_unit[NUM_TEX_UNITS]{};
+    bool has_sampled_tex_unit[NUM_TEX_UNITS]{};
+    bool cache_texture_samples{true};
     Id noise1d_table{};
     Id noise2d_table{};
     Id lut_offsets{};

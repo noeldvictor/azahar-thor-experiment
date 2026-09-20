@@ -1978,3 +1978,20 @@
   thread 5.00 ms. The GPU model predicts 14.8 ms for the same frame. Reaching 200% at 2x needs
   both halved, not one. At 3x and 4x the CPU stays near 14.7 ms while the frame grows to 27 and
   45 ms, so those are GPU only.
+- Fragment ALU is not the limit, confirmed after the depth change (2026-09-19). The early depth
+  test now rejects hidden pixels, so a shorter shader should show if ALU were the cost. It does
+  not. At 3x the lighting hoist, which removes 34 of about 217 instructions, gives 60.96% with it
+  off against 61.52% with it on, and the two sample ranges overlap. Cutting 16% of the ALU buys
+  under 1%. Do not convert the combiner to half precision on the assumption that ALU is the cost;
+  the measurement says it is not. The per-pixel cost is elsewhere.
+- Texture samples were already deduplicated by the optimizer (2026-09-19, neutral). `GetSource`
+  called the sampling function again for every reference, and a combiner stage asks for the same
+  unit from both the colour and the alpha side, so the generator emitted many fetches for one
+  unit. `cache_texture_samples` emits one per unit instead. At 3x it measures 61.57% on against
+  61.47% off, which is no change: the SPIR-V optimizer was already merging them. The caching is
+  kept because it emits less code for the optimizer to clean up, not because it is faster.
+- Tiled rendering re-tested after the depth change and still rejected (2026-09-19). Removing the
+  fragment depth write should let the low resolution Z pass work, which only exists on the tiled
+  path, so tiling was measured again. At 3x: forced `sysmem` 61.52%, forced `gmem` 55.64%,
+  and letting the driver choose per pass 56.75%. The direct path keeps its lead. The bundled
+  default of `TU_DEBUG=sysmem` stays.
