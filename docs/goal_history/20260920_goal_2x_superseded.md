@@ -1,15 +1,3 @@
-# Goal
-
-**Current goal, set 2026-09-20: E.X. Troopers holds full speed at 3x with the Snapdragon GSR
-screen filter, measured in the snow field from save state 5.** The full statement, the reason the
-target moved from 2x, and where it stands are in
-[goal_history/20260920_goal_3x.md](goal_history/20260920_goal_3x.md).
-
-The 2x goal below is superseded and kept for its procedure and for the list of everything that was
-ruled out with numbers. Do not restart that search; read its outcome section first.
-
----
-
 # Performance goal: E.X. Troopers on the AYN Thor
 
 This is a document, not a slash command. `/goal` is Claude Code's built-in command: it takes a

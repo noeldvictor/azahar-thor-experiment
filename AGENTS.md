@@ -2317,3 +2317,9 @@
   So 4x is the honest target for this device and 2x is the one setting that cannot look right on
   it. Any future goal for the Thor should be written against 4x, not 2x. Quote this measurement
   rather than the 3DS resolution when someone asks why 2x looks soft.
+- Snapdragon GSR is free and changes what resolution is worth running (2026-09-20).
+  `screen_filter = 2` measures 64.10% against 63.73% without it at 3x, and 2x with it holds
+  100.03% at 60 FPS while looking clearly sharper than plain 2x. It runs once on the final
+  present, so its cost does not scale with the scene. Two operating points follow: 2x with GSR for
+  full speed, and 3x with GSR for the closest thing to native on this panel. Recommend GSR on any
+  Thor profile; there is no measured reason to leave it off.
