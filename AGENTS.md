@@ -2178,3 +2178,13 @@
   snapshots the vertex data, because the guest may rewrite that memory while the draw is still in
   flight. A zero copy path needs the dirty region tracking to cover in-flight draws, or it will
   corrupt geometry in games that stream vertices.
+- Why tiling loses, concretely (2026-09-19). `RenderManager::CreateRenderPass` gives every
+  attachment `loadOp = eLoad` and `storeOp = eStore`, because a 3DS pass almost always continues
+  on content the previous pass left. On a tiler that means each of the 95 passes per frame pays a
+  full tile load and a full tile store of its target, and nine targets get loaded and stored about
+  ten times each per frame. On the direct path those two operations are free, because the
+  attachment is memory rather than a tile. That is the whole reason forcing `TU_DEBUG=sysmem`
+  wins here, and it is an adaptation to the guest's rendering model, not a workaround. Skipping
+  the load with `eDontCare` needs proof that a pass fully overwrites its target, which the
+  emulator cannot know before the draws arrive, so it does not help. Do not revisit tiling
+  without first changing the pass structure itself.
