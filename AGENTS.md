@@ -2387,3 +2387,53 @@
   not the emulator's. Its per-title profile is therefore set to 2x with GSR, which measures 99.97%
   mean and 99.87% minimum over eight samples at 59.74 FPS and 13.21 ms, against a 16.67 ms budget,
   with the GPU at 680 MHz and 88% busy, from save state 5 in the snow field.
+- The four-point matrix, re-measured on the shipping build (2026-09-20). Snow field, save state 5,
+  eight samples a row, GPU at 680 MHz in every sample of every row so none is void, screenshot of
+  the scene taken from each run.
+
+  | resolution | frame limit | speed mean | speed min | FPS | frame | target | met |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 2x | 100 | 99.96% | 99.79% | 59.83 | 13.35 ms | 100% | yes |
+  | 3x | 100 | 63.79% | 63.20% | 38.13 | 26.21 ms | 100% | no |
+  | 4x | 100 | 39.07% | 38.67% | 23.08 | 42.65 ms | 100% | no |
+  | 2x | 200 | 118.15% | 116.23% | 70.75 | 14.13 ms | 200% | no |
+
+- The three failures are not the same failure (2026-09-20). This had been assumed all along and is
+  wrong. The frame time split separates them: at 3x the overlay reads `SWP 12.0ms` and at 4x
+  `SWP 25.3ms`, so both are blocked waiting on the GPU and are fragment bound. At 2x with the
+  limit at 200 it reads `SWP 0.0ms` with `CMD 8.8ms`, so the GPU is idle-waiting and that row is
+  **CPU bound on guest command processing**. 200% needs 8.33 ms a frame and command processing
+  alone is 8.5 to 8.8 ms, so no fragment shader change can reach it. The standing note that the
+  measured cause of this goal's shortfall is the fragment shaders holds for 3x and 4x only.
+- First CPU profile of the snow field (2026-09-20). `simpleperf record --app ... -e cpu-clock -g`
+  for 20 s at 2x with the limit at 200, so the CPU is the binding constraint, 20374 samples. The
+  emulation thread is named `NativeEmulation`, not `EmuThread`, which is why an earlier filtered
+  report came back empty. Thread split: NativeEmulation 79.3%, VulkanWorker 13.2%, VulkanPresent
+  2.4%. Inclusive cost inside the emulation thread:
+
+  | symbol | children | self |
+  | --- | --- | --- |
+  | `Pica::PicaCore::ProcessCmdList` | 54.1% | 3.95% |
+  | `Pica::PicaCore::DrawArrays` | 43.7% | 0.30% |
+  | `Vulkan::RasterizerVulkan::Draw` | 29.9% | 0.44% |
+  | `AccelerateDrawBatch` | 13.3% | 0.09% |
+  | `SetupVertexArray` | 9.8% | 1.63% |
+  | `memcpy_opt` (libc) | 6.6% | 6.61% |
+  | `RasterizerCache::GetFramebufferSurfaces` | 6.6% | 0.80% |
+  | `RasterizerCache::ValidateSurface` | 5.2% | 0.27% |
+  | `SyncTextureUnits` | 4.9% | 0.97% |
+  | `tu_update_descriptor_sets` (Turnip) | 4.4% | 4.35% |
+  | `PipelineCache::BindPipeline` | 4.3% | 0.27% |
+  | `SyncAndUploadLUTsLF` | 1.9% | 1.87% |
+
+  The profile is flat: there is no single item worth more than about 7%, and the cost is per-draw
+  work spread over roughly 1,843 draws a frame at 71 FPS, which is about 131,000 draws a second.
+  Reaching 200% needs the frame cut from 13.8 ms to 8.33 ms, a 40% reduction, and nothing in this
+  list is close to that on its own. Call chains through libc do not resolve in this build, so
+  `memcpy_opt` could not be attributed to a caller.
+  The two candidates the profile does support, both general to every title and neither yet tried:
+  `GetFramebufferSurfaces` already caches the surface lookup behind `framebuffer_surface_cache`,
+  but still rebuilds two `SurfaceParams`, calls `UpdateParams` twice and runs `ValidateSurface`
+  twice on every draw even when the cache hits, which is where its 6.6% sits; and the descriptor
+  path costs 4.4% inside the driver, which `VK_KHR_push_descriptor` would remove rather than
+  cache. The earlier rejected experiment was descriptor set *reuse*, which is a different change.

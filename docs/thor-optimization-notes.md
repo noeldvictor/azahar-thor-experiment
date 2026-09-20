@@ -9622,3 +9622,14 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   spread. The emulator therefore has roughly a factor of twelve of headroom at 3x on a normal 3D
   title and clears the panel's native 4.5x comfortably. The snow field's 30 to 33 full screen
   blended passes are the game's own renderer, and 2x with GSR is its operating point.
+- The 200% row is CPU bound, not shader bound (2026-09-20). Re-running the four-point matrix on
+  the shipping build separated two failure modes that had been treated as one. At 3x and 4x the
+  overlay reads `SWP 12.0ms` and `SWP 25.3ms`, so the emulation thread is waiting on the GPU and
+  the fragment count is the cost, as recorded. At 2x with the frame limit at 200 it reads
+  `SWP 0.0ms` and `CMD 8.8ms`: the GPU is idle-waiting and guest command processing is the wall.
+  200% means an 8.33 ms frame and command processing alone is 8.5 to 8.8 ms of the 13.8 ms frame,
+  so that row cannot be reached by any shader change and was never a fragment problem.
+  A 20 second `simpleperf` profile at that operating point, 20374 samples, gives a flat emulation
+  thread: `ProcessCmdList` 54% inclusive, `DrawArrays` 44%, `Vulkan::Draw` 30%, then nothing above
+  7% self. It is per-draw cost spread over about 1,843 draws a frame. The thread is called
+  `NativeEmulation`; a report filtered on `EmuThread` returns zero samples.

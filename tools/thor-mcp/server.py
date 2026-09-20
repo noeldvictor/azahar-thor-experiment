@@ -875,7 +875,9 @@ def cpu_profile(
     another user's process. Hardware events such as cpu-cycles stay refused on this kernel, so
     the default event is the software clock, which samples the same way.
 
-    thread filters by thread name, for example "EmuThread". Symbol names come from the
+    thread filters by thread name. The emulation thread is called "NativeEmulation"; there is
+    no thread called "EmuThread", and filtering on that name returns zero samples. The other
+    threads worth naming are "VulkanWorker" and "VulkanPresent". Symbol names come from the
     unstripped library in the build tree; the installed one is stripped. Returns the report
     text and the local path of the recording."""
     if _pid() is None:
