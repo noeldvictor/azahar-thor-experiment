@@ -1,3 +1,17 @@
+# DISABLED BY DEFAULT. Every rule below is commented out. Read the warning before enabling.
+#
+# These rules were tuned in the snow field and they are WRONG everywhere else in the game. With
+# them on, the heads-up display loses its weapon icons, some text does not draw, and surfaces
+# that should blend show the alpha-test checkerboard underneath. The materials they drop are not
+# only the blizzard: the same fragment shaders draw HUD and interface elements in other scenes.
+# A fingerprint identifies a shader, not a purpose, and one shader serves several purposes.
+#
+# They are kept because the measurement is real and reproducible: with them on, the snow field
+# runs at 99.66% at 3x against 63.79% without, and the scene keeps its brightness, blizzard,
+# lighting and outlines. That is worth having for anyone who wants to tune this per scene.
+#
+# To use them, uncomment the lines and check every scene you care about, not just one.
+#
 # E.X. Troopers - coarse shading and draw rules for the AYN Thor.
 # Format: <fragment shader fingerprint>:<action>, one per line.
 # Actions: 2 or 4 for 2x2 or 4x4 coarse shading, thinN to keep one draw in N, skip to drop.
@@ -13,24 +27,24 @@
 # What this costs: the halftone dot screening over the cliffs and characters, which is part of
 # the game's comic-book look. The blizzard, the lighting and the ink outlines are kept. Delete
 # this file, or comment lines out, to get the original picture back at a lower frame rate.
-725FE625080ECDA8:skip
-53CA73516B463D4F:skip
-D0B9F1CFEBFD2AA8:skip
-7DC248F98DF841B3:skip
-E271321963FF048E:skip
-520AC5A5E2A1C101:skip
-F64F6838A17FEA84:skip
-87DE6C3594D3310E:skip
-06FA134A74941A94:skip
-6A5B3E263788FCF9:skip
-BF69B478363B5244:skip
-483BC75B7CBBB59B:skip
-CA826E4F52FDEF28:skip
-DF1619E09BCCE8B7:skip
-E7E8D48DE7DA276C:skip
-4B7D28C6225E1248:skip
-5A1D690A733C5DB2:skip
-B4AF0E42F0C48750:skip
-B51204FBE41473A1:skip
-47B7FB1070EE9717:skip
-132D092EF39D4D98:skip
+# 725FE625080ECDA8:skip
+# 53CA73516B463D4F:skip
+# D0B9F1CFEBFD2AA8:skip
+# 7DC248F98DF841B3:skip
+# E271321963FF048E:skip
+# 520AC5A5E2A1C101:skip
+# F64F6838A17FEA84:skip
+# 87DE6C3594D3310E:skip
+# 06FA134A74941A94:skip
+# 6A5B3E263788FCF9:skip
+# BF69B478363B5244:skip
+# 483BC75B7CBBB59B:skip
+# CA826E4F52FDEF28:skip
+# DF1619E09BCCE8B7:skip
+# E7E8D48DE7DA276C:skip
+# 4B7D28C6225E1248:skip
+# 5A1D690A733C5DB2:skip
+# B4AF0E42F0C48750:skip
+# B51204FBE41473A1:skip
+# 47B7FB1070EE9717:skip
+# 132D092EF39D4D98:skip

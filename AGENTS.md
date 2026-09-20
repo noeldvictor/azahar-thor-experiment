@@ -2644,3 +2644,21 @@
   deleting it restores the original picture at about 64%.
   Measuring brightness rather than judging it is what made the bisection reliable; a light layer
   and a particle layer are indistinguishable from render state and easy to confuse by eye.
+- The 3x rule set was shipped as a default and it was wrong to (2026-09-20, corrected the same
+  day). The 21 skip rules hold 99.66% at 3x in the snow field with the blizzard, lighting, ink
+  outlines and brightness intact. In other scenes of the same game they drop the heads-up
+  display's weapon icons, stop some text drawing, and leave the alpha-test checkerboard showing
+  through surfaces that should blend. Seen directly on the device once the game moved past the
+  save state.
+  **A fingerprint identifies a shader, not a purpose.** The same fragment shader configuration
+  that draws a sheet of blowing snow also draws an interface element somewhere else, because both
+  are a blended textured quad with the same combiner setup. Nothing about a `PicaFSConfig` hash
+  says what a material is for. The bisection that produced these rules was sound, and its
+  conclusion was only ever "these are safe **in this scene**"; shipping it as a default silently
+  widened that to the whole game.
+  The rule file now ships with every line commented out and a warning at the top, and the profile
+  is back to 2x with GSR, which holds 99.97% with the picture untouched everywhere. The rules are
+  kept rather than deleted because the measurement is real and reproducible.
+  **The standing rule this earns:** a change that alters what is drawn must be checked in more
+  than one scene before it becomes a default. Speed can be judged from one save state; correctness
+  cannot. If only one scene is reachable, the change ships off by default.
