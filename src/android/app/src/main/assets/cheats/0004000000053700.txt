@@ -1,24 +1,92 @@
-# E.X. Troopers (Japan, title 0004000000053700), and the Fan Translators International
-# English patch, which shares the title id.
-#
-# The patched build and the Japanese build have DIFFERENT addresses. Enable only the set that
-# matches the ROM you are running or the code writes into unrelated memory.
-#
-# Sourced from Reshiban/60FPS-AR-CHEATS-3DS, which carries a file per build:
-#   English patch: Cheats/E.X. Troopers (English Patched)/0004000000053700.txt (codes by @Hazerou)
-#   Japanese:      Cheats/E.X. Troopers (JPN)/0004000000053700.txt (codes by @NanashiFinal13)
-# All of the codes below were read from those two files rather than retyped from a summary.
-#
-# This game already runs at 60 FPS. Measured on the AYN Thor with no cheat enabled: 59.74 to
-# 59.83 game FPS at 99.97% speed in the snow field, confirmed by grepping the device cheat file
-# for the *citra_enabled marker and finding none. Videos in this game present at 30.
-# So the codes below are a frame rate target override rather than an unlock: they write 60.0f
-# (42700000) or 30.0f (41F00000) to the game's target. The 30 FPS code is the useful one on a
-# handheld, because halving the presentation rate is the cheapest way to buy headroom in a heavy
-# scene. Do not enable a 60 FPS code expecting it to double anything.
-#
-# An earlier version of this file claimed the game is 30 FPS by design. That was wrong and is
-# corrected here.
+*E.X. Troopers (Japan, title 0004000000053700), and the Fan Translators International
+*English patch, which shares the title id.
+*
+*The patched build and the Japanese build have DIFFERENT addresses. Enable only the set that
+*matches the ROM you are running or the code writes into unrelated memory.
+*
+*The gameplay codes come from the GBAtemp CTRPF AR cheat database, whose entry is headed
+*"0004000000053700 (Japan, FAN TRANSLATORS INT. ENGLISH PATCH v1.0, 1.01 & 1.02)", so they are
+*for the patched build. That page refuses automated fetching, so they were supplied by hand.
+*Checked before adding rather than trusted: the button masks match their descriptions, since
+*L is 0x200 and 0x240 is L+UP, 0x280 is L+DOWN and 0x220 is L+LEFT; the ammo value 0000270F is
+*9999 as its comment claims; and the pointer walk in the first code is the ordinary
+*D3 offset, 60 load, B0 follow, write, D2 end shape.
+*NONE OF THEM HAVE BEEN RUN YET. Try them one at a time.
+*
+*The frame rate and rendering codes come from Reshiban/60FPS-AR-CHEATS-3DS, a file per build:
+*English patch: Cheats/E.X. Troopers (English Patched)/0004000000053700.txt (codes by @Hazerou)
+*Japanese:      Cheats/E.X. Troopers (JPN)/0004000000053700.txt (codes by @NanashiFinal13)
+*All of the codes below were read from those two files rather than retyped from a summary.
+*
+*This game already runs at 60 FPS. Measured on the AYN Thor with no cheat enabled: 59.74 to
+*59.83 game FPS at 99.97% speed in the snow field, confirmed by grepping the device cheat file
+*for the *citra_enabled marker and finding none. Videos in this game present at 30.
+*So the codes below are a frame rate target override rather than an unlock: they write 60.0f
+*(42700000) or 30.0f (41F00000) to the game's target. The 30 FPS code is the useful one on a
+*handheld, because halving the presentation rate is the cheapest way to buy headroom in a heavy
+*scene. Do not enable a 60 FPS code expecting it to double anything.
+*
+*An earlier version of this file claimed the game is 30 FPS by design. That was wrong and is
+*corrected here.
+
+[Infinite ammo, Main Weapon - English Patch]
+D3000000 081EE000
+60000000 00000000
+B0000000 00000000
+00000C94 0000270F
+D2000000 00000000
+*9999 ammo.
+
+[Infinite ammo, Main and Secondary - English Patch]
+D3000000 08000000
+001EE008 4F800000
+D2000000 00000000
+*Instant cooldown, no reload period. Also applies to Gingira.
+
+[Akrid speed, L+UP normal, L+DOWN slow, L+FREEZE left - English Patch]
+DD000000 00000240
+D3000000 08000000
+001EDFD8 3F800000
+D2000000 00000000
+DD000000 00000280
+D3000000 08000000
+001EDFD8 3DCCCCC0
+D2000000 00000000
+D3000000 08000000
+DD000000 00000220
+001EDFD8 00000000
+D2000000 00000000
+*Slows or freezes Akrids. Do not use on a scenario without this type of foe.
+
+[Soldier speed, L+UP normal, L+DOWN slow, L+LEFT freeze - English Patch]
+DD000000 00000240
+D3000000 08000000
+001EDFC0 3F800000
+D2000000 00000000
+DD000000 00000280
+D3000000 08000000
+001EDFC0 3DCCCCC0
+D2000000 00000000
+D3000000 08000000
+DD000000 00000220
+001EDFC0 00000000
+D2000000 00000000
+*Slows or freezes human enemies. Do not use on a scenario without this type of foe.
+
+[Vital Suit speed, L+UP normal, L+DOWN slow, L+LEFT freeze - English Patch]
+DD000000 00000240
+D3000000 08000000
+001EDFF0 3F800000
+D2000000 00000000
+DD000000 00000280
+D3000000 08000000
+001EDFF0 3DCCCCC0
+D2000000 00000000
+D3000000 08000000
+DD000000 00000220
+001EDFF0 00000000
+D2000000 00000000
+*Slows or freezes Vital Suits and mecha. Do not use on a scenario without this type of foe.
 
 [60 FPS, hold R for 30 - English Patch]
 D3000000 00000000
