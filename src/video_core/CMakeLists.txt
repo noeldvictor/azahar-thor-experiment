@@ -26,6 +26,7 @@ add_library(video_core STATIC EXCLUDE_FROM_ALL
     pica/geometry_pipeline.cpp
     pica/geometry_pipeline.h
     pica/pica_core.cpp
+    pica/lut_convert.h
     pica/pica_core.h
     pica/output_vertex.cpp
     pica/output_vertex.h

@@ -14,6 +14,7 @@
 #include "core/loader/loader.h"
 #include "core/memory.h"
 #include "video_core/frame_profile.h"
+#include "video_core/pica/lut_convert.h"
 #include "video_core/pica/pica_core.h"
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -1198,9 +1199,7 @@ void RasterizerVulkan::SyncAndUploadLUTsLF() {
 
         Common::Vec2f* new_data = reinterpret_cast<Common::Vec2f*>(buffer + bytes_used);
         const auto& source_lut = pica.lighting.luts[index];
-        for (u32 i = 0; i < source_lut.size(); i++) {
-            new_data[i] = {source_lut[i].ToFloat(), source_lut[i].DiffToFloat()};
-        }
+        Pica::LutConvert::LightingEntries(&source_lut[0].raw, new_data, source_lut.size());
         fs_data.lighting_lut_offset[index / 4][index % 4] =
             static_cast<int>((offset + bytes_used) / sizeof(Common::Vec2f));
         fs_data_dirty = true;
@@ -1210,9 +1209,7 @@ void RasterizerVulkan::SyncAndUploadLUTsLF() {
     // Sync the fog lut
     if (pica.fog.lut_dirty) {
         Common::Vec2f* new_data = reinterpret_cast<Common::Vec2f*>(buffer + bytes_used);
-        for (u32 i = 0; i < pica.fog.lut.size(); i++) {
-            new_data[i] = {pica.fog.lut[i].ToFloat(), pica.fog.lut[i].DiffToFloat()};
-        }
+        Pica::LutConvert::FogEntries(&pica.fog.lut[0].raw, new_data, pica.fog.lut.size());
         fs_data.fog_lut_offset = static_cast<int>((offset + bytes_used) / sizeof(Common::Vec2f));
         fs_data_dirty = true;
         bytes_used += pica.fog.lut.size() * sizeof(Common::Vec2f);

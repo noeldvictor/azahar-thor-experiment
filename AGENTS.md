@@ -2129,3 +2129,14 @@
   its padding: the counts do not track the padded surface size.
   `ThorHeavyPasses` in the profiling build prints the heaviest passes with their area and draw
   count. Use it before proposing any change that claims to cut overdraw.
+- Lighting and fog table conversion is NEON now (2026-09-19, accepted). `SyncAndUploadLUTsLF`
+  rebuilt every dirty table one entry at a time, unpacking a 12-bit fixed point pair and dividing
+  each half into a float. The lighting set alone is 24 tables of 256 entries, and the CPU profile
+  put the function at 1.97% of the emulation thread. `Pica::LutConvert` in
+  `src/video_core/pica/lut_convert.h` does four entries per iteration. It divides rather than
+  multiplying by a reciprocal, so the floats are the same bit for bit, and the scalar tail is
+  kept as the reference. Measured at 1x from save state 5, where the frame is CPU bound, 200.24%
+  against 198.56%. At 2x it measures 120.43% against 120.52%, which is no change, because the GPU
+  is 99.8% busy there and a CPU saving cannot show. Keep it: it is strictly less work and it will
+  matter more on Thor Lite. The three PICA tables do not share a layout, so read the union in
+  `pica_core.h` before touching a converter; proctex, lighting and fog each pack differently.
