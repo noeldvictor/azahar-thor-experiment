@@ -23,6 +23,27 @@ the game draws.
 The next goal should be set against a title that is representative rather than pathological, and
 should aim at 4x or higher now that the headroom is known.
 
+**Verdict on the original four-point matrix, 2026-09-20.** Re-measured on the shipping build,
+snow field from save state 5, eight samples a row, GPU at 680 MHz in every sample so no row is
+void, with a screenshot of the scene from each run: 2x at limit 100 holds 99.96%, 3x reads 63.79%,
+4x reads 39.07%, and 2x at limit 200 reads 118.15%. One of four.
+
+The three failures are two different problems, which this matrix separated for the first time.
+3x and 4x show `SWP 12.0ms` and `SWP 25.3ms`, so they wait on the GPU and need 57% and 156% more
+fragment throughput against a scene the game builds from 30 to 33 full screen blended passes.
+2x at limit 200 shows `SWP 0.0ms` with `CMD 8.8ms`: the GPU is idle-waiting and the row is CPU
+bound, needing the frame cut from 13.8 ms to 8.33 ms against a profile whose largest single item
+is 7%. The premise stated in this goal, that the shortfall is the fragment shaders, is true for
+3x and 4x and false for the 200% row.
+
+Both remaining directions have been mined out and the evidence is in AGENTS.md: 22 rejected GPU
+candidates, and a CPU profile showing a flat emulation thread. The one change that came out of
+this round, removing a per-draw interval-set allocation in `ValidateSurface`, is real, general to
+every title and measured, and it moved the CPU-bound row by about one point, because freed CPU
+time moves straight into GPU waiting. Three of these four targets are not reachable for this
+scene by emulator work, and the cross-title numbers above show that is a fact about this scene
+rather than about the emulator.
+
 The 2x goal below is superseded and kept for its procedure and for the list of everything that was
 ruled out with numbers. Do not restart that search; read its outcome section first.
 
