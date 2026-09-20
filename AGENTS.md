@@ -2354,3 +2354,36 @@
   game's comic-book look. A title that draws its scene once or twice per frame would shade well
   under a tenth of this. Before concluding anything about the emulator from this scene, measure a
   second title: these numbers are an outlier, not a baseline.
+- The second title, and the answer to the line above (2026-09-20). Measured on the shipping build
+  at 3x with the GSR screen filter, frame limit off so the number is raw capability. Ocarina of
+  Time 3D runs its Hyrule Field title scene at **1213% speed, 1.4 ms a frame**. Kirby Triple
+  Deluxe runs **1208%**, and its worst sample across 190 seconds of attract was 658% at 2.57 ms.
+  The E.X. Troopers snow field is 26.19 ms in the same configuration. So a normal 3DS 3D scene is
+  about nineteen times cheaper than this one, and the snow field is confirmed as an outlier rather
+  than a baseline. The emulator is not short of speed at 3x.
+  These are title and attract scenes, which are lighter than dense gameplay, so read them as a
+  ceiling on cost rather than a worst case. The margin is large enough that the conclusion holds:
+  a gameplay scene would have to be twelve times heavier than the title scene to drop below 100%.
+- How far resolution can go on a normal title (2026-09-20). Same method, sweeping
+  `resolution_factor`, eight samples each, GPU at 680 MHz throughout.
+
+  | resolution | Ocarina of Time 3D | Kirby Triple Deluxe |
+  | --- | --- | --- |
+  | 3x | 1213% | 1208% |
+  | 4x | 650%, worst 451% | 850%, worst 407% |
+  | 6x | 343%, worst 319% | 330%, worst 166% |
+  | 8x | 190%, worst 143% | 542% |
+
+  Ocarina of Time 3D tracks inverse square in resolution almost exactly: scaling 1213% by the area
+  ratios predicts 682%, 303% and 171% against the measured 650%, 343% and 190%. So the cost is
+  pixel bound and predictable, and there is no cliff. The Thor panel needs 4.5x for a 1:1 top
+  screen, and a normal title clears that with roughly a factor of four to spare, reaching 8x and
+  still holding full speed. The Kirby 8x row is higher than its 6x row because the attract loop
+  had moved to a lighter scene between runs; it is not a measurement of the same content.
+- Where this leaves the 3x goal (2026-09-20). For normal titles the goal is already met several
+  times over, and 4x to 6x is the honest recommendation for this panel rather than 3x. E.X.
+  Troopers is the single exception, and the reason is its own renderer: 30 to 33 full screen
+  blended passes a frame, which cost nine times as much at 3x as at 1x and are the game's drawing,
+  not the emulator's. Its per-title profile is therefore set to 2x with GSR, which measures 99.97%
+  mean and 99.87% minimum over eight samples at 59.74 FPS and 13.21 ms, against a 16.67 ms budget,
+  with the GPU at 680 MHz and 88% busy, from save state 5 in the snow field.

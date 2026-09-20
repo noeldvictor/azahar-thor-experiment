@@ -5,6 +5,24 @@ screen filter, measured in the snow field from save state 5.** The full statemen
 target moved from 2x, and where it stands are in
 [goal_history/20260920_goal_3x.md](goal_history/20260920_goal_3x.md).
 
+**Outcome, 2026-09-20, later the same day.** The goal is met for the emulator and not for this
+one title, and the two were separated by measuring a second and third game for the first time.
+At 3x with GSR and no frame limit, Ocarina of Time 3D runs at 1213% and Kirby Triple Deluxe at
+1208%, against 26.19 ms a frame for the snow field. Sweeping resolution on Ocarina of Time 3D
+gives 650% at 4x, 343% at 6x and 190% at 8x, inverse square in resolution to within the spread.
+So a normal 3D title has about twelve times the headroom it needs at 3x and clears the panel's
+native 4.5x with room to spare; **4x to 6x is the honest recommendation for this panel, not 3x.**
+
+E.X. Troopers is the exception and the reason is its own renderer, not ours: 30 to 33 full screen
+blended passes a frame, which cost nine times as much at 3x as at 1x. Its per-title profile is
+set to 2x with GSR, measured at 99.97% mean and 99.87% minimum over eight samples, 59.74 FPS at
+13.21 ms against a 16.67 ms budget, GPU at 680 MHz and 88% busy, from save state 5 in the snow
+field. Reaching 3x on this title would mean shading fewer fragments, which means changing what
+the game draws.
+
+The next goal should be set against a title that is representative rather than pathological, and
+should aim at 4x or higher now that the headroom is known.
+
 The 2x goal below is superseded and kept for its procedure and for the list of everything that was
 ruled out with numbers. Do not restart that search; read its outcome section first.
 

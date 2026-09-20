@@ -9605,3 +9605,20 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   64.31%, both inside the spread and both meaning a deliberately non-conformant driver. With
   `gmem`, autotune, `noubwc` and `noconcurrentresolves` already measured, there is no remaining
   switch; a Turnip change would have to be a patch to its compiler or render path.
+- Cross-title measurement settles the 3x question (2026-09-20). Every number in this ledger up to
+  now came from the E.X. Troopers snow field, and the open question was whether its cost was the
+  emulator's or the game's. Five of the save states already on the device belonged to unknown
+  titles, so the title ids were resolved by reading them out of the ROMs directly: a `.zcci` is a
+  0x60 byte `Z3DS` header followed by zstd frames of 256 KiB, so decompressing the first frame
+  gives the NCSD header and the media id at offset 0x108. Validated against the one ROM whose
+  filename carries its id. The states themselves turned out to be unloadable, written by upstream
+  build 2125.0.1 and rejected by boost serialization with a class version error on
+  `shared_ptr<Memory::PageTable>`; `allow_savestate_mismatch` covers the build name check, not a
+  genuine archive format difference. The measurement was taken from attract and title scenes
+  instead, which need no input.
+  At 3x with GSR and no frame limit, Ocarina of Time 3D reads 1213% at 1.4 ms and Kirby Triple
+  Deluxe 1208%, against 26.19 ms for the snow field. Sweeping resolution, Ocarina of Time 3D gives
+  650% at 4x, 343% at 6x and 190% at 8x, which is inverse square in resolution to within the
+  spread. The emulator therefore has roughly a factor of twelve of headroom at 3x on a normal 3D
+  title and clears the panel's native 4.5x comfortably. The snow field's 30 to 33 full screen
+  blended passes are the game's own renderer, and 2x with GSR is its operating point.
