@@ -224,6 +224,23 @@ Draw count is not cost. A shader with thousands of cheap draws can matter less t
 few draws that cover the screen, so rank candidates by measuring with `bench`, never by the
 count `shader_use` reports.
 
+## A change that alters what is drawn is checked in more than one scene
+
+Speed can be judged from one save state. Correctness cannot. On 2026-09-20 a set of draw rules was
+tuned in the E.X. Troopers snow field, measured carefully, and shipped as that title's default: it
+held 99.66% at 3x against 63.79%, with the blizzard, lighting, ink outlines and scene brightness
+all intact and verified by measuring mean image brightness rather than by eye. The first time the
+game moved past that save state it was missing its weapon icons and some of its text, and showed
+the alpha-test checkerboard through surfaces that should blend.
+
+**A fingerprint identifies a shader, not a purpose.** The same fragment shader configuration that
+draws a sheet of blowing snow draws an interface element somewhere else, because both are a
+blended textured quad with the same combiner setup. Nothing in a `PicaFSConfig` hash says what a
+material is for. The bisection was sound, and its conclusion was only ever "safe in this scene".
+
+So: anything that changes what is drawn ships off by default until it has been seen in several
+scenes, including a menu and a heads-up display. If only one scene is reachable, it ships off.
+
 ## When instrumentation disagrees with a measurement, suspect the instrumentation
 
 Twice on 2026-09-20 a counter told a clean story that was wrong. `ThorShaderUse` recorded the
@@ -233,6 +250,28 @@ shaders carried a twelve point speed gain. Applying rules to exactly those two m
 which is what exposed it. A `simpleperf` report filtered on `EmuThread` returned zero samples
 because the thread is called `NativeEmulation`. Check that a surprising counter agrees with an
 independent measurement before building on it.
+
+## Where to go next
+
+Ranked, with the reason rather than just the task.
+
+1. **Check the E.X. Troopers draw rules across scenes.** They are measured, real, and currently
+   shipped disabled because they break the interface outside the snow field. Finding which of the
+   21 also draw the heads-up display would make them shippable. This needs someone to bring the
+   game to a menu, a battle and a dialogue scene; it cannot be done from one save state.
+2. **Raise the default resolution.** The panel wants 4.5x for a 1:1 top screen, the global default
+   is 3x, and a normal title is nowhere near limited there: Ocarina of Time 3D reads 650% at 4x
+   and 190% at 8x. Bumping the default and spot checking a handful of titles is the largest
+   whole-library gain available for the least work.
+3. **HD texture packs in ASTC, with a repo list.** The format layer already exists,
+   `CustomPixelFormat` covers `ASTC4`, `ASTC6`, `ASTC8`, `BC1`, `BC3`, `BC5` and `BC7`, and
+   `CustomFileFormat` covers PNG, DDS and KTX. What is unverified is whether the KTX and ASTC path
+   loads end to end, and whether `preload_textures` handles a compressed format or assumes RGBA8.
+   What is missing is the distribution side ARMSX2 has: a curated manifest so packs are
+   discoverable and installable per title id instead of hand copied. ASTC matters on a handheld
+   because it is hardware decoded and four to eight times smaller than RGBA8 in both memory and
+   bandwidth. This improves how games look rather than how fast they run, and is independent of
+   all the performance work.
 
 ## Open work
 

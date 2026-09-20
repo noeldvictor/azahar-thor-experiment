@@ -224,13 +224,43 @@ A 3DS frame is about ninety passes over small targets, and tiling them costs mor
 In the heaviest E.X. Troopers scene this moved 2x from 75.6% to about 96% of full speed. Put a
 `TU_DEBUG` line in `thor_driver_env.txt` in the user directory to override it.
 
+## Draw rules
+
+A per-title file can name individual materials and change how they are drawn. A material is named
+by its fragment shader fingerprint, the hash of the PICA combiner, lighting, fog and alpha test
+setup, which is the same idea as a Dolphin graphics mod naming a texture hash. The actions are a
+coarse shading rate of `2` or `4` through `VK_KHR_fragment_shading_rate`, `thinN` to submit one
+draw in every N, and `skip` to drop the material.
+
+Rules live in `ShaderRules/<title id>.txt` in the user directory, one per line, `#` for comments.
+They are read at launch, so an experiment needs no rebuild. A file you already have is never
+overwritten, and deleting it restores the untouched picture.
+
+To find fingerprints, build with `-PthorFrameProfiling=true` and read the `ThorShaderUse` and
+`ThorCoarsened` lines in the log. Rank candidates by measuring, not by draw count: a full screen
+sheet is a handful of draws and a cheap material can be thousands.
+
+> [!WARNING]
+> A fingerprint identifies a shader, not a purpose. The same shader that draws a sheet of blowing
+> snow can draw a heads-up display element in another scene, so rules tuned in one place can
+> remove interface elements somewhere else. Check every scene you care about. The E.X. Troopers
+> rule file ships commented out for exactly this reason: it takes its snow field from 63.79% to
+> 99.66% at 3x, and it also removes weapon icons elsewhere in the game.
+
 ## Per-title settings
 
 Each game can carry its own settings. The fork ships a profile for a title under
 `assets/game_profiles`, the app installs it on first run, and it never overwrites settings you
 already changed. To see or change them, long-press a game and open **Game Settings**; only the
-values you change are stored for that game. E.X. Troopers ships at 2x, which holds full speed in
-its heaviest scene on the Thor.
+values you change are stored for that game. E.X. Troopers ships at 2x with the Snapdragon GSR
+screen filter, which holds 99.97% in its heaviest scene on the Thor with the picture untouched
+everywhere in the game.
+
+How much resolution a title can take varies enormously, so measure rather than assume. At 3x with
+GSR, Ocarina of Time 3D reads 1213% and Kirby Triple Deluxe 1208%, and Ocarina of Time 3D still
+holds 190% at 8x. The E.X. Troopers snow field reads 63.79% at the same setting, because it draws
+about 1800 alpha blended meshes a frame at roughly 58x overdraw. The panel draws the 3DS top
+screen at 1800x1080, so 4.5x is native 1:1 and most titles clear it comfortably.
 
 Measured on 2026-09-18 in the E.X. Troopers engine scene at 2x and 100% speed: 59.4 FPS with
 the GPU 64 to 83% busy on the bundled driver, against 51 FPS at 99.9% on the system Qualcomm
