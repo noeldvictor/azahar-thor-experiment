@@ -2111,3 +2111,12 @@
   the shader statistics show 67 sync stalls in a 92 instruction program. Anyone looking for the
   next win should look at what the shaders wait on, not at how many instructions they run: the
   arithmetic has already been measured at about 13% of the frame.
+- Texture filtering is not the cost either (2026-09-19). Nearest filtering fetches one texel
+  where linear fetches four, so switching it off prices the texture path. At 3x it measures
+  64.00% against 63.58%, which is under one percent. Combined with the other measurements the
+  frame is now fully accounted for and nothing large is left: arithmetic 13%, framebuffer
+  compression already saving 12%, render passes 3.5%, barriers 3.5%, texture filtering under 1%.
+  What remains is the raw fragment rate. The scene needs 33.7 million fragments per frame at 2x,
+  and at 72 frames per second that is 2.4 gigapixels per second, which is close to what this part
+  delivers for shading with a texture fetch and a blend. Doubling the speed would need twice that
+  rate. Treat 200% at 2x in this scene as out of reach, and say so rather than looking again.
