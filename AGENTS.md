@@ -1995,3 +1995,20 @@
   path, so tiling was measured again. At 3x: forced `sysmem` 61.52%, forced `gmem` 55.64%,
   and letting the driver choose per pass 56.75%. The direct path keeps its lead. The bundled
   default of `TU_DEBUG=sysmem` stays.
+- The second Thor panel costs nothing measurable (2026-09-19). The frame profile shows 3.41 Mpix
+  presented per frame across two panels, against 0.69 Mpix rendered at 2x, which looked like a
+  fixed cost worth attacking. Turning the secondary display off with
+  `Layout.secondary_display_layout = 0` measures 61.34% at 3x against 61.47% with it on. Leave
+  the secondary display alone.
+- No 16-bit render target is being widened (2026-09-19). A 3DS RGB565, RGB5A1 or RGBA4 target
+  emulated as RGBA8 would double the blending bandwidth, which would explain a per-pixel cost.
+  The driver reports only one fallback on this device, `B8G8R8Unorm` to `R8G8B8A8Unorm`, and
+  that is a texture format which is never used as an attachment. The theory is dead.
+- What the remaining per-pixel cost looks like (2026-09-19). The scene shades far more pixels
+  than the screen holds: five rounds of about 163 draws each into one 512x1024 target at 2x,
+  with a fourteen pass downsample chain between rounds. Cutting fragment ALU does nothing, so
+  the overdraw is not in the long lit shaders; it is in many short blended draws, which no depth
+  test can reject from each other. Tiled rendering is the standard answer to blended overdraw
+  and it still loses here, because the target is loaded and stored five times per frame. That
+  is the shape of the remaining problem: it needs either a Turnip change that survives frequent
+  target switches, or fewer emulated pixels, which would change the picture.
