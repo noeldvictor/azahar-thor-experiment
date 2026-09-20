@@ -162,6 +162,9 @@ void ReportFrameProfileWindow() {
              values[Index(FrameProfileEvent::RasterizerInvalidations)],
              values[Index(FrameProfileEvent::DirtyRegionUpdates)],
              values[Index(FrameProfileEvent::DirtyRegionUpdatesElided)]);
+    LOG_INFO(Render_Vulkan, "ThorFrameProfile draws alias_attachment={} pipeline_changes={}",
+             values[Index(FrameProfileEvent::TextureAliasesAttachment)],
+             values[Index(FrameProfileEvent::PipelineChanges)]);
     LOG_INFO(Render_Vulkan,
              "ThorFrameProfile present blits={} copies={} direct={} mpix={:.3f} "
              "queue_wait_ms_per_swap={:.3f} combined_submissions={}",

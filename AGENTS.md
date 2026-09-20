@@ -2012,3 +2012,20 @@
   and it still loses here, because the target is loaded and stored five times per frame. That
   is the shape of the remaining problem: it needs either a Turnip change that survives frequent
   target switches, or fewer emulated pixels, which would change the picture.
+- A render pass costs 5.5 microseconds, measured (2026-09-19). `pass_restart_every` ends and
+  restarts the pass every N draws without changing what is drawn, so a pass can be priced.
+  At 1x from save state 5: untouched 8.42 ms per frame, restart every 8 draws 9.66 ms, restart
+  every 2 draws 13.51 ms. That is about 231 and 923 extra passes, giving 5.4 and 5.5 microseconds
+  per pass. The snow field runs 97 passes per frame, so all of them together are 0.53 ms. Render
+  passes are not where the frame goes; stop looking there.
+- Draws do not sample their own colour target (2026-09-19). A draw that reads the image it writes
+  forces the driver to flush between draws, which would have explained a microsecond-scale
+  per-draw cost. The counter says 10 such draws per frame out of 1,843. The theory is dead.
+- The frame at 2x, counted (2026-09-19): 1,843 draws, 97 render passes, 713 pipeline changes and
+  10 self-sampling draws. Roughly two draws in five change the pipeline.
+- At 1x the emulator is CPU bound, not GPU bound (2026-09-19). The frame is 8.38 ms and the
+  emulation thread accounts for 8.35 ms of it: 4.84 ms of guest command processing and 3.36 ms of
+  the rest. The kernel still reports the GPU 97% busy, because a submission is outstanding, so
+  that number must not be read as the GPU doing work. Treat roughly 8.3 ms per frame as the CPU
+  floor at any resolution. It is why 200% at 2x needs a CPU cut as well as a GPU cut: 200% leaves
+  only 8.33 ms per frame.

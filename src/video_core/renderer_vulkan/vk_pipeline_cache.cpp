@@ -15,6 +15,7 @@
 #include "video_core/pica/shader_setup.h"
 #include "video_core/renderer_vulkan/pica_to_vk.h"
 #include "video_core/renderer_vulkan/vk_descriptor_update_queue.h"
+#include "video_core/frame_profile.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
 #include "video_core/renderer_vulkan/vk_render_manager.h"
@@ -380,6 +381,9 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
 
     const bool is_dirty = scheduler.IsStateDirty(StateFlags::Pipeline);
     const bool pipeline_dirty = (current_pipeline != pipeline) || is_dirty;
+    if (pipeline_dirty) {
+        VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::PipelineChanges);
+    }
     scheduler.Record([this, is_dirty, pipeline_dirty, pipeline,
                       current_dynamic = current_info.dynamic_info, dynamic = info.dynamic_info,
                       descriptor_sets = bound_descriptor_sets, offsets = offsets,

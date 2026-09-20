@@ -91,6 +91,11 @@ enum class FrameProfileEvent : u32 {
     FallbackPrimitiveState,
     FallbackTopology,
     FallbackBackend,
+    /// A draw that samples the image it is drawing into. The driver has to flush between
+    /// such draws, which costs far more than the draw itself.
+    TextureAliasesAttachment,
+    /// A draw whose pipeline differs from the one the previous draw used.
+    PipelineChanges,
     Count,
 };
 

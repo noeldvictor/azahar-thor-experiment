@@ -9539,3 +9539,13 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   The 2x row at limit 100 sits a tenth of a percent under 100% because the frame limiter cannot
   exceed its own target; the GPU is only 91.4% busy there, and the same scene reaches 114.99%
   once the limit is raised, so the headroom is real.
+- Where the snow field frame goes, decomposed (2026-09-19). Frame time against emulated pixels
+  is 8.42 ms at 1x, 14.55 ms at 2x, 27.17 ms at 3x and 44.63 ms at 4x, for 172,800, 691,200,
+  1,555,200 and 2,764,800 pixels. A straight line through the 3x and 4x points gives 14.4 ns per
+  pixel and a 6.0 ms intercept, and it predicts 1x within 0.04 ms. The intercept is not GPU work
+  that can be cut with a driver flag: at 1x the emulation thread alone accounts for 8.35 ms of
+  the 8.38 ms frame, so the intercept is mostly the CPU floor. Render passes were priced
+  separately at 5.5 us each, and the 97 passes per frame come to 0.53 ms, so they are not it.
+  The two remaining targets are the CPU floor, about 8.3 ms per frame, and the 14.4 ns per
+  pixel. To reach 200% at 2x the frame must fit in 8.33 ms, which the CPU floor alone fills. To
+  reach 100% at 3x the frame must fit in 16.67 ms against 27.17 ms today.

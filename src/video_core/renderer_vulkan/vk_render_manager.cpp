@@ -47,6 +47,14 @@ void RenderManager::BeginRendering(const Framebuffer* framebuffer,
     if (pass.render_pass && !(pass == new_pass)) {
         ClassifyRestart(new_pass, framebuffer->Images());
     }
+    // Measurement switch: end the pass every N draws so one render pass can be priced. The
+    // same pass begins again straight away, so the drawing is unchanged.
+    const u32 restart_every = Settings::values.pass_restart_every.GetValue();
+    if (restart_every != 0 && pass.render_pass && pass == new_pass &&
+        ++draws_since_forced_restart >= restart_every) {
+        draws_since_forced_restart = 0;
+        EndRendering();
+    }
     images = framebuffer->Images();
     aspects = framebuffer->Aspects();
     shadow_rendering = framebuffer->shadow_rendering;

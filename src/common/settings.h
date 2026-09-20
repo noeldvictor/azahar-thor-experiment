@@ -669,6 +669,11 @@ struct Values {
     /// over. The value is the same every time. Turn it off to compare.
     Setting<bool> cache_texture_samples{true, Keys::cache_texture_samples};
 
+    /// Measurement switch. Ends and restarts the render pass every N draws, so the cost of
+    /// one render pass can be read off the frame time. Zero leaves the passes alone. The
+    /// picture stays correct; only the speed changes.
+    Setting<u32> pass_restart_every{0, Keys::pass_restart_every};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

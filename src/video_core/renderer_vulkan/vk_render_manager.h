@@ -70,6 +70,9 @@ public:
     /// Logs the render pass sequence of one frame, at most once per second. Diagnostic only.
     void ReportPassTrace();
 
+    /// Counts draws since the last forced pass restart. See Settings pass_restart_every.
+    u32 draws_since_forced_restart{};
+
 private:
     /// Creates a renderpass configured appropriately and stores it in cached_renderpasses
     vk::UniqueRenderPass CreateRenderPass(vk::Format color, vk::Format depth,

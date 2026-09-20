@@ -973,6 +973,11 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
         // Bind the texture provided by the rasterizer cache
         Surface& surface = res_cache.GetTextureSurface(texture);
         Sampler& sampler = res_cache.GetSampler(texture.config);
+        // A draw that samples its own colour target forces the driver to flush between draws.
+        if (framebuffer != nullptr && surface.Image() == framebuffer->Images()[0]) {
+            VideoCore::AddFrameProfileEvent(
+                VideoCore::FrameProfileEvent::TextureAliasesAttachment);
+        }
         const vk::ImageView color_view = framebuffer->ImageView(SurfaceType::Color);
         const bool is_feedback_loop = color_view == surface.FramebufferView();
         const vk::ImageView texture_view =
