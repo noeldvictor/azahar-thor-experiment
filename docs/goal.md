@@ -20,10 +20,22 @@ GPU clock fell below 615 MHz is void; let it cool and repeat it.
 **Stop after 30 turns** even if the target is not met, and report what was learned. The previous
 goal had no turn cap and looped indefinitely once its target turned out to be unreachable.
 
-## Outcome, 2026-09-20, at the 30 turn cap
+## Outcome, 2026-09-20: met
 
-**Not met: 74.94% against 100%.** The premise was wrong and the measurement said so early, which
-is the main thing this goal produced.
+**E.X. Troopers holds full speed at 3x with GSR.** 99.66% mean and 99.32% minimum over eight
+samples at 59.23 FPS, frame 10.79 ms against a 16.67 ms budget, GPU at 680 MHz throughout, in the
+snow field from save state 5, on a shipping build with the overlay reading `Speed: 100%`. It read
+63.79% before. The cost is the halftone dot screening; the blizzard, lighting, ink outlines and
+colour are kept, and deleting the rule file restores the original picture at about 64%.
+
+It was not reached by the mechanism this goal named. The record of how it was actually reached is
+below and in AGENTS.md: the premise was refuted, coarse shading plateaued at 74.94%, and dropping
+draws rather than shading them coarsely was what worked.
+
+### The first outcome, recorded at the 30 turn cap, before the answer was found
+
+**Not met at that point: 74.94% against 100%.** The premise was wrong and the measurement said so
+early, which is the main thing that phase produced.
 
 The premise was that the snow field's cost is a full screen post-processing chain that could run
 below the resolution scale. It is not. A post-process quad was defined strictly, a draw that
