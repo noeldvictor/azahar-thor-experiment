@@ -2085,3 +2085,14 @@
   fragment ALU did not matter; it does, but the shaders that cover the pixels are the short ones,
   not the lit ones. The global default stays on, because dropping the quantisation is an accuracy
   trade. The E.X. Troopers profile turns it off.
+- Framebuffer compression is already doing its job (2026-09-19). `TU_DEBUG=sysmem,noubwc` turns
+  UBWC off and costs 12%: 55.84% at 3x against 63.58% with it on. So the scene is bandwidth
+  sensitive and the hardware is already saving that bandwidth. There is no win left there, and it
+  confirms the remaining per-pixel cost is memory traffic from blended overdraw rather than
+  arithmetic.
+- How much of the frame the fragment ALU is, measured (2026-09-19). Removing the per-stage
+  combiner rounding takes about 36 instructions out of a shader of roughly 100 and buys 4.8% at
+  2x with the limit at 200. That puts the whole fragment ALU at roughly 13% of the frame. Halving
+  it with 16-bit types would therefore be worth about 6%, not the 20% a first estimate suggested,
+  so the float16 rewrite of the combiner is not worth its risk. Record this before anyone
+  proposes it again.
