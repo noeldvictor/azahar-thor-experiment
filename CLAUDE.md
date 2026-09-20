@@ -139,6 +139,29 @@ When a measurement finds the setting a title wants, record it in that title's fi
 and the numbers behind it, and note it in the notes. That is how a finding reaches users instead
 of staying in a log.
 
+## What resolution the Thor needs
+
+The main panel is 1920x1080 and the emulator draws the 3DS top screen at 1800x1080 inside it,
+measured from a screenshot. The 3DS top screen is 400x240, so native 1:1 for this panel is
+1080 / 240 = 4.5x. That sets what each setting looks like:
+
+| resolution | rendered | scaling to panel | result |
+| --- | --- | --- | --- |
+| 2x | 800x480 | upscaled 2.25x | visibly soft |
+| 3x | 1200x720 | upscaled 1.5x | good with a sharpening filter |
+| 4x | 1600x960 | upscaled 1.125x | near native |
+| 5x | 2000x1200 | downscaled 0.9x | supersampled, sharpest |
+
+**Target 3x to 4x for this device, not 2x.** 2x is the one setting that cannot look right on this
+panel. Prefer 3x with `screen_filter = 2`, which is Snapdragon Game Super Resolution: it runs
+once on the final present and measured free, 64.10% against 63.73% without it in the E.X.
+Troopers snow field, and it recovers most of the sharpness 4x would give at 3x cost. Use 4x when
+a title has the headroom, and 5x when both panels are in use so each downscales instead of
+stretching.
+
+Write any new performance goal against 3x or 4x. A goal written against 2x optimises for a
+picture nobody should be looking at on this hardware.
+
 ## Performance expectation on the Thor
 
 The 3DS GPU is a 268 MHz PICA200 that draws 400x240 and 320x240 frames. The Thor's Adreno 740
