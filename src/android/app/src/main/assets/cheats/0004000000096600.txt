@@ -1,0 +1,32 @@
+*Castlevania: Lords of Shadow - Mirror of Fate (USA), title 0004000000096600.
+*
+*Source: the GBAtemp CTRPF AR cheat database. Ported to the USA Gateway build by
+*NanashiFinal13, who posted them saying he had already ported the MP, Hearts and Speed codes
+*and could not work out the Health one. There is therefore no infinite HP code here.
+*
+*Only his USA ports are included. The same post carries a second set beginning [SEL+UP
+*Infinite HP], but those are the codes he was asking someone to port FROM, for another region,
+*so they would write into unrelated memory on a USA build and are deliberately left out.
+*
+*Checked before adding: the write widths match their purposes, 1 is a 16 bit write for MP, 2 is
+*an 8 bit write for Hearts and 0 is a 32 bit write for Speed. The speed code corroborates
+*itself, since the author separately identified 00145B50 as holding 3F800000, which is 1.0 as a
+*float, and the code writes 40000000, which is 2.0.
+*
+*NOT YET RUN. These use a D3 offset of zero rather than the 08000000 base seen in other 3DS
+*code sets, so if they do nothing the base is the first thing to suspect. Try one at a time.
+
+[Infinite MP, all characters]
+D3000000 00000000
+102F222A 0000EDC4
+D2000000 00000000
+
+[Infinite Hearts, all characters]
+D3000000 00000000
+2034782F 00000041
+D2000000 00000000
+
+[Speed x2]
+D3000000 00000000
+00145B50 40000000
+D2000000 00000000
