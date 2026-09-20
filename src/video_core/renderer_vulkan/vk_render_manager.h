@@ -108,6 +108,9 @@ private:
     vk::UniqueQueryPool timestamp_pool;
     u32 timestamp_index{};
     bool timestamps_ready{};
+    /// Counts fragment shader invocations per render pass, which is the only way to see how
+    /// much of the frame is overdraw.
+    vk::UniqueQueryPool fragment_pool;
 };
 
 } // namespace Vulkan

@@ -525,6 +525,9 @@ bool Instance::CreateDevice() {
                 .logicOp = features.logicOp,
                 .samplerAnisotropy = features.samplerAnisotropy,
                 .fragmentStoresAndAtomics = features.fragmentStoresAndAtomics,
+                // Counting fragment shader invocations is the only way to see how much
+                // overdraw a scene really has. The feature costs nothing until a query runs.
+                .pipelineStatisticsQuery = features.pipelineStatisticsQuery,
                 .shaderClipDistance = features.shaderClipDistance,
             },
         },

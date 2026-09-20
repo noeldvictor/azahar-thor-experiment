@@ -120,10 +120,23 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
             cmdbuf.resetQueryPool(pool, 0, MaxTimedPasses * 2);
         });
     }
+    if (!fragment_pool) {
+        const vk::QueryPoolCreateInfo frag_info = {
+            .queryType = vk::QueryType::ePipelineStatistics,
+            .queryCount = MaxTimedPasses,
+            .pipelineStatistics =
+                vk::QueryPipelineStatisticFlagBits::eFragmentShaderInvocations,
+        };
+        fragment_pool = instance.GetDevice().createQueryPoolUnique(frag_info);
+        scheduler.Record([pool = *fragment_pool](vk::CommandBuffer cmdbuf) {
+            cmdbuf.resetQueryPool(pool, 0, MaxTimedPasses);
+        });
+    }
     if (timestamp_index < MaxTimedPasses) {
-        scheduler.Record([pool = *timestamp_pool, slot = timestamp_index](
-                             vk::CommandBuffer cmdbuf) {
+        scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
+                          slot = timestamp_index](vk::CommandBuffer cmdbuf) {
             cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, pool, slot * 2);
+            cmdbuf.beginQuery(frag, slot, vk::QueryControlFlags{});
         });
     }
 #endif
@@ -205,8 +218,25 @@ void RenderManager::ReportPassTrace() {
             LOG_INFO(Render_Vulkan, "ThorPassTime timed={} sum_overlapping_ms={:.2f} top={}",
                      timed, total_ms, top);
         }
-        scheduler.Record([pool = *timestamp_pool](vk::CommandBuffer cmdbuf) {
+        std::vector<u64> frags(timed, 0);
+        const vk::Result frag_result = instance.GetDevice().getQueryPoolResults(
+            *fragment_pool, 0, timed, frags.size() * sizeof(u64), frags.data(), sizeof(u64),
+            vk::QueryResultFlagBits::e64);
+        if (frag_result == vk::Result::eSuccess) {
+            u64 total = 0;
+            for (const u64 value : frags) {
+                total += value;
+            }
+            // Fragment shader invocations for the whole frame. Divide by the pixels on screen to
+            // get the overdraw factor, which is the number that says whether the scene can ever
+            // fit in the frame budget.
+            LOG_INFO(Render_Vulkan, "ThorFragments passes={} invocations={} mpix={:.3f}", timed,
+                     total, static_cast<double>(total) / 1.0e6);
+        }
+        scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool](
+                             vk::CommandBuffer cmdbuf) {
             cmdbuf.resetQueryPool(pool, 0, MaxTimedPasses * 2);
+            cmdbuf.resetQueryPool(frag, 0, MaxTimedPasses);
         });
     }
     timestamp_index = 0;
@@ -224,8 +254,9 @@ void RenderManager::EndRendering() {
 
 #if THOR_FRAME_PROFILING
     if (timestamp_pool && timestamp_index < MaxTimedPasses) {
-        scheduler.Record([pool = *timestamp_pool, slot = timestamp_index](
-                             vk::CommandBuffer cmdbuf) {
+        scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
+                          slot = timestamp_index](vk::CommandBuffer cmdbuf) {
+            cmdbuf.endQuery(frag, slot);
             cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, pool, slot * 2 + 1);
         });
         timestamp_index++;

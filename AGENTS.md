@@ -2096,3 +2096,18 @@
   it with 16-bit types would therefore be worth about 6%, not the 20% a first estimate suggested,
   so the float16 rewrite of the combiner is not worth its risk. Record this before anyone
   proposes it again.
+- The snow field shades 49 times the screen, measured (2026-09-19). A pipeline statistics query
+  around every render pass counts fragment shader invocations. At 2x the scene runs 33.7 million
+  invocations per frame against 691,200 pixels on screen, which is 49x overdraw. That is the
+  single number that explains the frame, and it is the game's own drawing, not emulator waste:
+  the trace shows five rounds of about 163 draws into one target with a downsample chain between
+  them, so the same pixels are painted many times over by blended particles and effect layers.
+  The counter lives in `RenderManager` and needs `pipelineStatisticsQuery`, which the instance now
+  enables.
+- The GPU is latency bound here, not throughput bound (2026-09-19). 33.7 Mpix per frame at 72
+  frames per second is 2.4 Gpix per second, which with roughly 100 instruction shaders is about
+  17% of the Adreno 740's arithmetic peak, and a similar fraction of its texture and blend rates.
+  Every unit sits at 10 to 20% of what it can do while the kernel reports the GPU 99.9% busy, and
+  the shader statistics show 67 sync stalls in a 92 instruction program. Anyone looking for the
+  next win should look at what the shaders wait on, not at how many instructions they run: the
+  arithmetic has already been measured at about 13% of the frame.
