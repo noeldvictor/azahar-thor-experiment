@@ -154,6 +154,7 @@ foreach(KEY IN ITEMS
     "cache_texture_samples"
     "pass_restart_every"
     "rgba8_storage_usage"
+    "accurate_tev_rounding"
     "language" # FIXME: DUPLICATE KEY (libretro equivalent: language_value)
     "web_api_url"
     "network_token"

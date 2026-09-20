@@ -294,6 +294,8 @@ private:
     Id sampled_tex_unit[NUM_TEX_UNITS]{};
     bool has_sampled_tex_unit[NUM_TEX_UNITS]{};
     bool cache_texture_samples{true};
+    /// Quantises every combiner stage to eight bits, as the PICA hardware did.
+    bool accurate_tev_rounding{true};
     Id noise1d_table{};
     Id noise2d_table{};
     Id lut_offsets{};

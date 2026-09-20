@@ -2074,3 +2074,14 @@
   with the limit at 100: 99.95% before, 99.99% after, over twelve samples each. Together with the
   nanosecond accumulator this took the reading from 99.91% to 99.99%. What is left is the noise
   of a sleep based limiter, which targets exactly 100% and so cannot report above it on average.
+- Per-stage combiner rounding costs real time, and the combiner ALU is what covers the pixels
+  (2026-09-19, accepted as a per-title option). `Byteround` quantises every texture combiner stage
+  to eight bits per channel, as the PICA did by writing each stage into an eight bit register. It
+  is a multiply, a round and a multiply per stage, on colour and again on alpha, which in a
+  40 to 100 instruction shader is a large share. `accurate_tev_rounding` turns it off. Snow field
+  at 2x with the frame limit at 200: 114.99% with it on, 120.52% with it off, over six samples
+  each, and the screenshots are identical. This also settles a question the lighting experiment
+  left open. Cutting 34 instructions from the long lit shaders did nothing, which suggested the
+  fragment ALU did not matter; it does, but the shaders that cover the pixels are the short ones,
+  not the lit ones. The global default stays on, because dropping the quantisation is an accuracy
+  trade. The E.X. Troopers profile turns it off.

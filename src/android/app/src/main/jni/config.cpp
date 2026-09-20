@@ -334,6 +334,7 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.cache_texture_samples);
     ReadSetting("Utility", Settings::values.pass_restart_every);
     ReadSetting("Utility", Settings::values.rgba8_storage_usage);
+    ReadSetting("Utility", Settings::values.accurate_tev_rounding);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

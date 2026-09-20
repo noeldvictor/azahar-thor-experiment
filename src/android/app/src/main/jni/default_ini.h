@@ -448,6 +448,12 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 0: Off, 1 (default): On
 )") DECLARE_KEY(rgba8_storage_usage) BOOST_HANA_STRING(R"(
 
+# Quantises each texture combiner stage to eight bits per channel, as the PICA did. It costs
+# a multiply, a round and a multiply per stage on colour and on alpha. Turning it off is an
+# accuracy trade.
+# 0: Off, 1 (default): On
+)") DECLARE_KEY(accurate_tev_rounding) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

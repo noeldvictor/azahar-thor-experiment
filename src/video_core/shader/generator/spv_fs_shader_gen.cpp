@@ -27,6 +27,7 @@ FragmentModule::FragmentModule(const FSConfig& config_, const Profile& profile_)
     // answer after it runs and before any interface is defined.
     writes_depth = !config.framebuffer.fixed_depth_range;
     cache_texture_samples = Settings::values.cache_texture_samples.GetValue();
+    accurate_tev_rounding = Settings::values.accurate_tev_rounding.GetValue();
     DefineArithmeticTypes();
     DefineUniformStructs();
     DefineInterface();
@@ -1178,6 +1179,9 @@ Id FragmentModule::ProcTexSampler() {
 }
 
 Id FragmentModule::Byteround(Id variable_id, u32 size) {
+    if (!accurate_tev_rounding) {
+        return variable_id;
+    }
     if (size > 1) {
         const Id scaled_vec_id{
             OpVectorTimesScalar(vec_ids.Get(size), variable_id, ConstF32(255.f))};

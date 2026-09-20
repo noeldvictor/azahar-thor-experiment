@@ -680,6 +680,12 @@ struct Values {
     /// measure that. A title that uses shadow rendering needs it on.
     Setting<bool> rgba8_storage_usage{true, Keys::rgba8_storage_usage};
 
+    /// Quantises each texture combiner stage to eight bits per channel, the way the PICA
+    /// wrote every stage into an eight bit register. It costs a multiply, a round and a
+    /// multiply per stage, on colour and on alpha, which is a large share of a short
+    /// shader. Turning it off is an accuracy trade: compare the screenshots.
+    Setting<bool> accurate_tev_rounding{true, Keys::accurate_tev_rounding};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};
