@@ -2469,3 +2469,30 @@
   instead. `swap_s` was 0.26 ms before and moves between 0.05 and 0.35 ms after. The 3x and 4x
   rows are unchanged within the spread, as expected, since they are GPU bound. General to every
   title and kept.
+- Why this title is slow and a normal one is not (2026-09-20). Worth stating plainly, because
+  every number in this ledger comes from one scene and the reason it is an outlier is structural
+  rather than accidental.
+  A normal 3DS game draws its scene once or twice into the screen buffer and presents it. Ocarina
+  of Time 3D and Kirby Triple Deluxe both do that, and both read about 1210% at 3x with GSR, or
+  1.4 ms a frame. E.X. Troopers builds its comic-book look out of full screen post-processing:
+  halftone screening, ink outlines, colour grading, bloom and the blizzard each read the previous
+  result and write another full screen buffer. That is 30 to 33 full screen passes a frame into
+  768x1536 targets at 3x, with 82 of its 97 passes reading an earlier pass's output, so they are a
+  serial chain that cannot be merged or reordered.
+  In fragments: the snow field shades about 72 million a frame at 3x against roughly 0.89 million
+  pixels actually on screen, which is about 81 fragments per output pixel. Most of them are
+  blended, so each is a read and a write of the colour buffer.
+  The important part is what resolution scaling does to that. Scaling multiplies every pass, so 3x
+  costs nine times as much per pass as 1x whatever the game is; the difference is how many passes
+  there are to multiply. A title with two full screen passes pays nine times on two. This one pays
+  nine times on thirty. That is the whole gap, and it widens rather than narrows as resolution
+  rises, which is why 4x reads 39% here and 650% on Ocarina of Time 3D.
+  On the real console none of this was extravagant. The same 81x overdraw over 400x240 is about
+  7.8 million fragments a frame, which the PICA200 absorbs at 60 FPS. The game was tuned to sit
+  inside the console's fill budget, and a fill budget is precisely the thing resolution scaling
+  spends. Blending makes it worse on this part specifically: at 3x the target is 4.7 MB against a
+  GMEM of a few MB, so a full screen blended pass cannot stay resident in the colour cache and
+  every blended fragment goes to memory.
+  The conclusion to carry forward: this scene is not evidence about the emulator. Judge the
+  emulator on a title that draws its scene once, and treat E.X. Troopers as the case that sets a
+  per-title resolution rather than a target to optimise towards.
