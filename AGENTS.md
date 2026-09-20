@@ -2253,3 +2253,11 @@
   the profiling build prints all three rectangles. With that settled, the overdraw is about six
   times per pass across roughly thirteen full screen passes, and all of it is the game's own
   layering.
+- Turnip debug flags are exhausted (2026-09-20). The goal points at patching our own driver, so
+  the remaining flags that could trade something for speed were measured at 3x against a 63.73%
+  baseline. `noconform`, which drops conformance-mandated behaviour that costs performance, gives
+  64.07%. Adding `nouboopt` gives 64.31%. Both are inside the run to run spread, and both would
+  mean shipping a driver that is deliberately not conformant, which risks other titles for under
+  a percent. Not taken. With `gmem`, autotune, `noubwc`, `noconcurrentresolves` and these two all
+  measured, the driver flag space is closed; a Turnip change would have to be a real patch to the
+  compiler or the render path, not a switch.
