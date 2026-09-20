@@ -229,3 +229,43 @@ a shader. That ratio consumes the headroom before resolution scaling starts.
 The honest target for this renderer and this scene is full speed at 2x with headroom to spare,
 and about 120% in fast forward. Anything beyond that needs the scene to shade fewer fragments,
 which means changing what the game draws.
+
+### What was ruled out, so none of it is retried
+
+Every line below is a measurement from the snow field, not an argument. The rules behind them
+live in AGENTS.md and the dated evidence in docs/thor-optimization-notes.md.
+
+| Candidate | Result |
+| --- | --- |
+| Fragment ALU | 13% of the frame; removing 36 of ~100 instructions bought 4.8% |
+| Half precision in the combiner | would follow from the above at roughly 6%; not worth the rewrite |
+| Render passes | 5.5 us each, 95 per frame, 0.53 ms in total |
+| Pass barriers | 0.49 ms per frame |
+| Framebuffer compression | already active and already saving 12% |
+| Tiled rendering | 55.64% against 63.58% at 3x; the driver choosing per pass gives 56.75% |
+| Turnip debug flags | `noconform` 64.07%, `noconform,nouboopt` 64.31%, both inside the spread |
+| Texture filtering | under 1% |
+| Shader occupancy and registers | already at the maximum of 16 waves with 6 registers |
+| GPU clock | 680 MHz is the top of the device's table; no cap was ever applied |
+| Storage usage flag on RGBA8 | no effect; UBWC is not being disabled by it |
+| Draws sampling their own target | 10 per frame out of 1,843 |
+| Screen buffer padding | never shaded; viewport and scissor are the used region |
+| Effect and blur buffers | only 4.5% of fragments; not scaling them cannot pay |
+| Stereoscopic rendering | already single eye |
+| The second Thor panel | free |
+| 16-bit render targets | none are being widened to 32-bit |
+| Cached upload memory | 4% slower than write-combined |
+| Android performance hint interface | 3% slower at 1x |
+| Texture descriptor set reuse | 1% slower |
+| Direct vertex attribute field reads | neutral; the compiler already folded it |
+| Unified memory for vertex data | worth about 3% of the CPU, and nothing above 1x |
+
+Fragment count scales cleanly with resolution, 32.88 million per frame at 2x and 137.92 million
+at 4x, so nothing degrades as the scale rises. The part looks 30% more efficient at 4x only
+because a partly covered 2x2 quad costs its full width and the counter excludes helper lanes.
+
+The two changes that did pay, and both help every game: the PICA depth transform moved out of the
+fragment shader into the viewport, which restored the early depth test and the low resolution Z
+pass, and the per-stage combiner quantisation made optional. Two frame limiter bugs, a NEON table
+conversion and an emulation thread priority also landed but show only where the frame is CPU
+bound.
