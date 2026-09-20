@@ -743,6 +743,7 @@ void RasterizerVulkan::DrawTriangles() {
 
 bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
+    draw_samples_render_target = false;
 {
         VideoCore::ScopedFrameProfileTimer timer{
             VideoCore::FrameProfileEvent::DrawSyncStateNanoseconds};
@@ -851,6 +852,25 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     }
     pass_color_addr = using_color_fb ? color_addr : 0;
     pass_depth_addr = using_depth_fb ? depth_addr : 0;
+
+    // Classify the draw for the post-processing measurement. A full screen post quad samples a
+    // target an earlier pass rendered into, neither tests nor writes depth, is a handful of
+    // vertices, and covers the target it draws to. Geometry fails at least one of these: it
+    // uses depth, or it has more than a quad's worth of vertices, or it covers part of the
+    // screen. The counts this feeds decide whether running such passes below the global
+    // resolution scale could pay, before any of it is wired to rendering.
+    const bool post_quad = draw_samples_render_target && !depth_used &&
+                           regs.pipeline.num_vertices <= 6 && framebuffer_rect.GetArea() > 0 &&
+                           static_cast<u64>(draw_rect.GetArea()) * 10 >=
+                               static_cast<u64>(framebuffer_rect.GetArea()) * 9;
+    renderpass_cache.NoteDrawPostQuad(post_quad);
+    renderpass_cache.NoteDrawShape(draw_samples_render_target, depth_used,
+                                   regs.pipeline.num_vertices <= 6,
+                                   framebuffer_rect.GetArea() > 0 &&
+                                       static_cast<u64>(draw_rect.GetArea()) * 10 >=
+                                           static_cast<u64>(framebuffer_rect.GetArea()) * 9,
+                                   regs.framebuffer.output_merger.alphablend_enable != 0,
+                                   regs.pipeline.num_vertices);
 
     // Configure viewport and scissor
     const auto viewport = fb_helper.Viewport();
@@ -995,6 +1015,7 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
         // Bind the texture provided by the rasterizer cache
         Surface& surface = res_cache.GetTextureSurface(texture);
         if (renderpass_cache.WasWrittenThisFrame(surface.Image())) {
+            draw_samples_render_target = true;
             VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::DrawReadsRenderTarget);
             renderpass_cache.NotePassReadsTarget();
         }

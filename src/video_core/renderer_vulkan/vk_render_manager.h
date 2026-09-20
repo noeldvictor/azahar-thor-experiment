@@ -76,6 +76,15 @@ public:
     [[nodiscard]] bool WasWrittenThisFrame(vk::Image image) const;
     void NotePassReadsTarget();
 
+    /// Classify the draw about to be recorded into the open pass. A post-process quad is a draw
+    /// that samples another render target, neither tests nor writes depth, and covers the target.
+    /// A pass made only of these is a candidate for running below the global resolution scale.
+    void NoteDrawPostQuad(bool is_post_quad);
+
+    /// Per-draw shape, so the heavy passes can be told apart from the post-processing ones.
+    void NoteDrawShape(bool samples_rt, bool depth_used, bool small_vertex_count, bool full_cover,
+                       bool blended, u32 vertices);
+
     /// Counts draws since the last forced pass restart. See Settings pass_restart_every.
     u32 draws_since_forced_restart{};
 
@@ -120,6 +129,15 @@ private:
     /// The render area of the pass that owns each query slot, recorded when the query
     /// begins so a fragment count can be attributed to the right target size.
     std::vector<std::pair<u32, u32>> slot_area;
+    // Per timed pass: how many of its draws matched the post-process quad shape, and how many
+    // draws it had in total. A pass where the two are equal is entirely post-processing.
+    std::vector<std::pair<u32, u32>> slot_post;
+    u32 pass_post_draws{};
+    // Frame-wide histogram of draw shape, reset with the rest of the per-frame counters.
+    u32 shape_draws{}, shape_samples_rt{}, shape_depth{}, shape_quad{}, shape_cover{},
+        shape_blended{};
+    u64 shape_vertices{};
+    u32 pass_total_draws{};
     /// Images this frame has rendered into, and whether the open pass has read one.
     std::vector<vk::Image> written_this_frame;
     bool pass_read_target{};

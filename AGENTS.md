@@ -2496,3 +2496,34 @@
   The conclusion to carry forward: this scene is not evidence about the emulator. Judge the
   emulator on a title that draws its scene once, and treat E.X. Troopers as the case that sets a
   per-title resolution rather than a target to optimise towards.
+- The post-processing premise is wrong for this scene, measured (2026-09-20). The new goal assumed
+  the snow field's cost was a full screen post-processing chain that could be run below the global
+  resolution scale. It is not, and the heuristic was validated against the counters before any of
+  it was wired to rendering, which is what stopped a large wasted implementation.
+  A post-process quad was defined as a draw that samples a target an earlier pass wrote, neither
+  tests nor writes depth, has at most six vertices, and covers at least 90% of its render target.
+  A pass counts as post only when every one of its draws matched. In the snow field at 3x:
+
+  | counter | value |
+  | --- | --- |
+  | `ThorPostChain` | `post_passes=50/95 post_frag=2953920 (4.1%) mixed_passes=0` |
+  | `ThorDrawShape` | `draws=1800 samples_rt=80 depth=1650 quad=200 cover=50 blended=1800 avg_verts=443.3` |
+  | `ThorPassShape` | `768x1536: 30 passes: 68879944 frag` of 72.2 million |
+
+  So 50 of the 95 passes are post-processing by the strictest reading, and they carry 4.1% of the
+  frame. The classification is clean rather than borderline: `mixed_passes=0`, so no pass is part
+  post and part geometry. The 95.4% lives in the 30 passes into the big 768x1536 target, and the
+  draws that fill them are not quads. All 1800 draws in the frame are alpha blended, only 80 of
+  them sample a render target at all, 1650 use depth, and they average 443 vertices. That is
+  geometry, not image processing: it is the blizzard, hundreds of blended snow and fog meshes
+  giving about 58x overdraw, which the screenshot shows directly.
+  Consequence for the three candidate mechanisms in the goal. **Scratch-target redirect and
+  per-surface `res_scale` are dead**: both key on identifying a post target, and the post targets
+  hold 4.1% of the work. **Variable rate shading survives**, because it applies per draw and does
+  not need the post-quad shape; it can be pointed at blended low-frequency geometry instead.
+- Pass restarts are the game's, not ours (2026-09-20). Re-measured in the snow field at 3x, per
+  swap: `color_switch=66.3`, `area_grow=5.1`, `area_other=5.1`, and `depth_toggle`,
+  `same_images`, `area_shrink` and `clear` all zero, against 97.2 pass begins. So two thirds of
+  the passes begin because the game changed colour target, and the depth-toggle restarts the
+  retention change was written for are gone. There is no pass merging left to win, which closes
+  the last route to making tiled rendering affordable here.

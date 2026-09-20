@@ -153,6 +153,8 @@ private:
     u32 uniform_size_aligned_fs;
     u32 uniform_size_aligned_gs_pica;
     bool gs_uniforms_valid{};
+    // Set during SyncTextureUnits when any bound texture is a target an earlier pass wrote.
+    bool draw_samples_render_target{};
     PAddr pass_color_addr{};
     PAddr pass_depth_addr{};
     bool geometry_expand_draw{};

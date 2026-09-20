@@ -141,6 +141,8 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
         }
         slot_area[timestamp_index] = {new_pass.render_area.extent.width,
                                       new_pass.render_area.extent.height};
+        pass_post_draws = 0;
+        pass_total_draws = 0;
         scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
                           slot = timestamp_index](vk::CommandBuffer cmdbuf) {
             cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, pool, slot * 2);
@@ -160,6 +162,24 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
     });
 
     pass = new_pass;
+}
+
+void RenderManager::NoteDrawPostQuad(bool is_post_quad) {
+    pass_total_draws++;
+    if (is_post_quad) {
+        pass_post_draws++;
+    }
+}
+
+void RenderManager::NoteDrawShape(bool samples_rt, bool depth_used, bool small_vertex_count,
+                                  bool full_cover, bool blended, u32 vertices) {
+    shape_draws++;
+    shape_samples_rt += samples_rt ? 1 : 0;
+    shape_depth += depth_used ? 1 : 0;
+    shape_quad += small_vertex_count ? 1 : 0;
+    shape_cover += full_cover ? 1 : 0;
+    shape_blended += blended ? 1 : 0;
+    shape_vertices += vertices;
 }
 
 void RenderManager::MarkWritten(vk::Image image) {
@@ -193,6 +213,10 @@ void RenderManager::ReportPassTrace() {
         // The trace holds one frame, so the query slots must start again with it. Without this
         // the slot numbers run on across frames and no longer name the pass they measured.
         pass_trace.clear();
+        slot_post.clear();
+        shape_draws = shape_samples_rt = shape_depth = shape_quad = shape_cover =
+            shape_blended = 0;
+        shape_vertices = 0;
         written_this_frame.clear();
         if (timestamp_pool && fragment_pool && timestamp_index != 0) {
             scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
@@ -330,6 +354,43 @@ void RenderManager::ReportPassTrace() {
             // fit in the frame budget.
             LOG_INFO(Render_Vulkan, "ThorFragments passes={} invocations={} mpix={:.3f}", timed,
                      total, static_cast<double>(total) / 1.0e6);
+            // What the post-process heuristic would actually capture. A pass counts only when
+            // every one of its draws matched, because a pass that also draws geometry cannot be
+            // moved to a lower scale without moving the geometry with it. The share of fragments
+            // is the number that decides whether the mechanism can pay: the frame has to be
+            // mostly post-processing for running it at a lower scale to reach the budget.
+            u64 post_frags = 0;
+            u32 post_passes = 0;
+            u64 mixed_frags = 0;
+            u32 mixed_passes = 0;
+            for (u32 i = 0; i < timed && i < slot_post.size(); i++) {
+                const auto [post_draws, total_draws] = slot_post[i];
+                if (total_draws == 0) {
+                    continue;
+                }
+                if (post_draws == total_draws) {
+                    post_passes++;
+                    post_frags += frags[i];
+                } else if (post_draws > 0) {
+                    mixed_passes++;
+                    mixed_frags += frags[i];
+                }
+            }
+            LOG_INFO(Render_Vulkan,
+                     "ThorDrawShape draws={} samples_rt={} depth={} quad={} cover={} blended={} "
+                     "avg_verts={:.1f}",
+                     shape_draws, shape_samples_rt, shape_depth, shape_quad, shape_cover,
+                     shape_blended,
+                     shape_draws ? static_cast<double>(shape_vertices) / shape_draws : 0.0);
+            LOG_INFO(Render_Vulkan,
+                     "ThorPostChain post_passes={}/{} post_frag={} ({:.1f}%) "
+                     "mixed_passes={} mixed_frag={} ({:.1f}%)",
+                     post_passes, timed, post_frags,
+                     total ? 100.0 * static_cast<double>(post_frags) / static_cast<double>(total)
+                           : 0.0,
+                     mixed_passes, mixed_frags,
+                     total ? 100.0 * static_cast<double>(mixed_frags) / static_cast<double>(total)
+                           : 0.0);
         }
         scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool](
                              vk::CommandBuffer cmdbuf) {
@@ -340,6 +401,10 @@ void RenderManager::ReportPassTrace() {
     timestamp_index = 0;
     timestamps_ready = false;
     pass_trace.clear();
+    slot_post.clear();
+    shape_draws = shape_samples_rt = shape_depth = shape_quad = shape_cover =
+        shape_blended = 0;
+    shape_vertices = 0;
 #endif
 }
 
@@ -357,6 +422,10 @@ void RenderManager::EndRendering() {
             cmdbuf.endQuery(frag, slot);
             cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, pool, slot * 2 + 1);
         });
+        if (slot_post.size() <= timestamp_index) {
+            slot_post.resize(timestamp_index + 1);
+        }
+        slot_post[timestamp_index] = {pass_post_draws, pass_total_draws};
         timestamp_index++;
         timestamps_ready = true;
     }
