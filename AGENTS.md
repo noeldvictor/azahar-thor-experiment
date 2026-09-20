@@ -2206,3 +2206,20 @@
 - Geometry shaders are already handled. `Instance::UseGeometryShaders` returns false on Android
   with a comment that they are extremely expensive on tilers, and the geometry path is expanded in
   the vertex shader instead. Do not "fix" this by turning them on.
+- The Android performance hint interface made things worse (2026-09-20, implemented, measured,
+  reverted). `APerformanceHint` is the mechanism an app is meant to use to tell the scheduler its
+  frame deadline, and nothing in the emulator used it. It was wired into the frame limiter, which
+  already knows both numbers: the work duration is the time the frame took before any sleep, and
+  the target is how long a frame is allowed to take at the current speed setting. The session was
+  created and the log confirmed it. It is slower: at 1x, where the frame is CPU bound, 198.27%
+  and then 195.24% on a repeat, against 201.62% with the thread priority alone. At 2x with the
+  limit at 100 it is neutral, 13.24 ms against 13.09 ms. Reverted.
+  The likely reason is that fast forward reports a target the thread can never meet, since the
+  limiter's target at 400% is a quarter of a guest frame, and a session that always misses its
+  deadline is not the case the interface is tuned for. Anyone retrying this should report the
+  displayed frame deadline rather than the limiter's, and should measure at 1x, because the
+  resolutions that matter are GPU bound and will show nothing either way.
+- The GPU is already at its ceiling (2026-09-20). The frequency table on this device is
+  680, 615, 550, 475, 401, 348, 295, 220 and 124.8 MHz, and `max_freq` is 680 MHz. Every
+  measurement in the ledger was taken at the top of that table, so there is no clock headroom
+  being left unused and the governor is not holding the part back.
