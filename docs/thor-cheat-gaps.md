@@ -66,3 +66,39 @@ so the mapping does not need rebuilding by hand. Compare that map against
 `/storage/emulated/0/Azaharuser/cheats` for a current list.
 
 Performance work belongs in `docs/thor-optimization-notes.md`.
+
+## What the public databases have, checked 2026-09-20
+
+The JourneyOver CTRPF-AR-CHEAT-CODES repository is the usual GitHub mirror of the GBAtemp CTRPF
+database. Its full file tree was fetched and matched against this library by title id.
+
+| | result |
+| --- | --- |
+| Title ids in the mirror | 628 |
+| Overlap with this library | 69 of 104 |
+| Of the 26 missing, found by title id | **0** |
+| Of the 26 missing, same game under another region | 5 |
+
+**The mirror is not the whole GBAtemp database, so a miss there is not a miss on GBAtemp.**
+E.X. Troopers is the proof: its codes exist in the GBAtemp thread and were added to this fork from
+there by hand, and the mirror does not carry that title at all. Any future sweep has to treat this
+repository as a lower bound.
+
+The five that exist for another region are listed below. Regional builds have different addresses,
+exactly as the E.X. Troopers English patch differs from the Japanese release, so these are leads
+for rebasing rather than codes that can be copied across.
+
+| Our title | Our id | In the database as | Its id |
+| --- | --- | --- | --- |
+| Cave Story 3D | `000400000004D200` | Cave Story 3D (USA) | `000400000004A100` |
+| Doctor Lautrec and the Forgotten Knights | `0004000000056200` | same (USA) | `0004000000036800` |
+| Mario Sports Superstars | `0004000000188C00` | same (EUR) | `0004000000188D00` |
+| Professor Layton and the Azran Legacy | `00040000000F3000` | same (GER, also FRA) | `00040000000F3100` |
+| Return to PoPoLoCrois | `000400000018CC00` | same (EUR) | `0004000000188F00` |
+
+Two name matches were rejected as different games: Castlevania Lords of Shadow Mirror of Fate
+against a Castlevania NES inject, and Project X Zone 2 against the first Project X Zone.
+
+GBAtemp itself returns HTTP 403 to automated fetching, as does GameFAQs, so the thread has to be
+read by hand. The repository's `ActionReplay.7z` was checked in case it held a fuller set; it
+contains only the plugin binary.
