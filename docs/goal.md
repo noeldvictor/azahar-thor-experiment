@@ -200,10 +200,15 @@ What the session reached in the snow field from save state 5, GPU at 680 MHz in 
 
 | resolution | frame limit | at start | at end | target |
 | --- | --- | --- | --- | --- |
-| 2x | 100 | 100%, GPU 99.8% busy | 99.9%, GPU 87.8% busy | 100% |
-| 2x | 200 | 103.40% | 120.52% | 200% |
-| 3x | 100 | 52.36% | 63.58% | 100% |
-| 4x | 100 | 31.07% | 39.03% | 100% |
+| 2x | 100 | 100%, GPU 99.8% busy | 99.97%, GPU 88.6% busy | 100% |
+| 2x | 200 | 103.40% | 119.39% | 200% |
+| 3x | 100 | 52.36% | 63.73% | 100% |
+| 4x | 100 | 31.07% | 39.44% | 100% |
+
+The end column is a final back to back run of all four on the shipping build, eight samples each,
+GPU 680 MHz throughout, with a screenshot of the snow field from each run. The 2x row at limit 100
+is the frame limiter on its target rather than a hardware limit: the GPU has 11% spare there and
+the same scene reaches 119% as soon as the limit is raised.
 
 The frame is fully accounted for. Fragment arithmetic is 13% of it, measured by removing the
 per-stage combiner rounding. Framebuffer compression is already saving 12%, measured by turning
