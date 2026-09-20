@@ -813,6 +813,51 @@ def ui_tap(text: str, display: int = 0) -> str:
 
 
 @mcp.tool()
+def thermals() -> dict:
+    """Read the device temperatures and the current frequency caps.
+
+    Call it before and after a measurement. A run is only comparable when the part was not
+    throttling: the goal treats a GPU clock below 615 MHz as void, and a CPU whose
+    scaling_max_freq has dropped below its rated peak is throttling even when the GPU has not.
+    Returns the hottest zones in Celsius, the GPU clock, and the maximum frequency each CPU
+    cluster is currently allowed."""
+    zones = {}
+    listing = _sh(
+        "for z in /sys/class/thermal/thermal_zone*; do "
+        "echo \"$(cat $z/type 2>/dev/null) $(cat $z/temp 2>/dev/null)\"; done"
+    )
+    for line in listing.splitlines():
+        parts = line.split()
+        if len(parts) != 2 or not parts[1].lstrip("-").isdigit():
+            continue
+        name = parts[0]
+        if not any(tag in name for tag in ("cpu", "gpu", "skin", "batt")):
+            continue
+        zones[name] = round(int(parts[1]) / 1000.0, 1)
+    hottest = dict(sorted(zones.items(), key=lambda kv: kv[1], reverse=True)[:8])
+
+    caps = {}
+    for cpu in (0, 4, 7):
+        value = _sh(f"cat /sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_max_freq 2>/dev/null")
+        peak = _sh(f"cat /sys/devices/system/cpu/cpu{cpu}/cpufreq/cpuinfo_max_freq 2>/dev/null")
+        try:
+            caps[f"cpu{cpu}_mhz"] = int(value.strip()) // 1000
+            caps[f"cpu{cpu}_peak_mhz"] = int(peak.strip()) // 1000
+        except ValueError:
+            continue
+    gpu_clock = _sh(f"cat {KGSL}/gpuclk").strip()
+    throttled = any(
+        caps.get(f"cpu{cpu}_mhz", 0) < caps.get(f"cpu{cpu}_peak_mhz", 0) for cpu in (0, 4, 7)
+    )
+    return {
+        "hottest_celsius": hottest,
+        "cpu_caps": caps,
+        "cpu_throttled": throttled,
+        "gpu_mhz": int(gpu_clock) // 1_000_000 if gpu_clock.isdigit() else gpu_clock,
+    }
+
+
+@mcp.tool()
 def cpu_profile(
     seconds: int = 10,
     frequency: int = 1000,

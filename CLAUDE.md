@@ -79,6 +79,10 @@ of a raw `adb` command when a tool exists.
   build, so a change can be measured against the same scene before and after a rebuild. Set it
   with `config_set`. It is off by default; a state whose format really changed will crash, so it
   is for testing only.
+- `thermals` reads the device temperatures and the current frequency caps. Call it before and
+  after a measurement. A reading only counts when the part was not throttling, and a CPU whose
+  `scaling_max_freq` has fallen below its rated peak is throttling even when the GPU clock is
+  still at 680 MHz.
 - `cpu_profile` records a CPU profile of the running app and returns the hottest symbols. Use it
   to find where frame time goes before you write a NEON or ARM64 change. The event is the
   software clock, because this kernel refuses hardware counters. Symbols come from the

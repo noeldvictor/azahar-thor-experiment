@@ -2272,3 +2272,10 @@
   which Vulkan requires, and the 66 colour switches per frame are the game alternating targets.
   `ThorPassShape` in the profiling build prints this grouping; use it on any other title before
   assuming its frame looks like this one.
+- Thermal check for measurement validity (2026-09-20). After several hours of measuring, the
+  hottest zones read 71.1 C on a CPU cluster and 64.6 C on the GPU, and no frequency cap had been
+  applied: `scaling_max_freq` still read 2803 MHz on the performance cluster and 3187 MHz on the
+  prime core, with the GPU at 680 MHz. So the slow drift in the 2x readings over the session,
+  100.02% down to 99.86%, is run to run noise and not heat. The `thermals` tool in the MCP server
+  returns all of this; call it either side of a measurement, because a CPU cap can fall while the
+  GPU clock still looks correct, and the GPU clock alone is what the goal checks.
