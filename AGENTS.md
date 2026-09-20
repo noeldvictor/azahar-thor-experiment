@@ -2437,3 +2437,35 @@
   twice on every draw even when the cache hits, which is where its 6.6% sits; and the descriptor
   path costs 4.4% inside the driver, which `VK_KHR_push_descriptor` would remove rather than
   cache. The earlier rejected experiment was descriptor set *reuse*, which is a different change.
+- Accepted: the per-draw interval-set allocation in `ValidateSurface` (2026-09-20). Every draw
+  validates its render target, twice, for colour and for depth. `ValidateSurface` asked whether
+  there was anything to do by building `surface.invalid_regions & validate_interval`, a fresh
+  `boost::icl` interval set, and then testing it for emptiness. A target that is already resident
+  intersects nothing, which is the overwhelmingly common case, so the answer was almost always
+  "empty" and the set was allocated and destroyed for nothing. At 2x the snow field runs about
+  1,843 draws a frame, so that is roughly 3,700 allocations a frame, or a quarter of a million a
+  second at 71 FPS.
+  `Surface::IsRegionValid` already answers the same question without allocating, and was already
+  being used three lines above for the fill-surface assertion: `find()` on an interval set returns
+  the first segment that intersects, so "nothing intersects" and "the intersection is empty" are
+  the same statement. It is now an early return before the intersection is built. When something
+  does intersect, control falls through to the original code unchanged.
+  Measured on the emulation thread with `simpleperf`, 2x with the frame limit at 200, about 16,500
+  samples each side: `ValidateSurface` inclusive 5.24% to 0.93%, `GetFramebufferSurfaces`
+  inclusive 6.61% to 2.27%, and the allocator rows that were 3.11% `operator new`, 3.06% `malloc`
+  and 2.96% `scudo allocate` all fell below the 0.3% reporting threshold.
+  On the device, snow field from save state 5, eight samples a row, GPU 680 MHz throughout:
+
+  | row | before | after |
+  | --- | --- | --- |
+  | 2x limit 100 | 99.96%, frame 13.35 ms, CMD 7.2 ms | 99.98%, frame 12.53 ms, CMD 6.6 ms |
+  | 2x limit 200 | 118.15% | 119.48% |
+  | 3x limit 100 | 63.79% | 63.56% |
+  | 4x limit 100 | 39.07% | 39.62% |
+
+  The honest reading: the CPU saving is real and proven by the profile and by the overlay's own
+  command-processing figure falling from 7.2 ms to 6.6 ms, but it converts to only about 1% of
+  speed on the row that is CPU bound, because as soon as frames come faster the GPU starts to wait
+  instead. `swap_s` was 0.26 ms before and moves between 0.05 and 0.35 ms after. The 3x and 4x
+  rows are unchanged within the spread, as expected, since they are GPU bound. General to every
+  title and kept.

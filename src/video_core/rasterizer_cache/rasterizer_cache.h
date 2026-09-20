@@ -1091,6 +1091,17 @@ void RasterizerCache<T>::ValidateSurface(SurfaceId surface_id, PAddr addr, u32 s
         return;
     }
 
+    // The intersection below builds a fresh interval set, which allocates. Every draw validates
+    // its render target, and a target that is already resident intersects nothing, so that is the
+    // common case by a wide margin: at 2x the snow field runs about 1,843 draws a frame and each
+    // one asks this question twice, for colour and for depth. IsRegionValid answers it with a
+    // single lookup and no allocation, and it is the same question: find() on an interval set
+    // returns the first segment that intersects, so "nothing intersects" and "the intersection is
+    // empty" are the same statement.
+    if (surface.IsRegionValid(validate_interval)) {
+        return;
+    }
+
     SurfaceRegions validate_regions = surface.invalid_regions & validate_interval;
 
     if (validate_regions.empty()) {

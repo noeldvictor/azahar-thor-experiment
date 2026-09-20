@@ -9633,3 +9633,15 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   thread: `ProcessCmdList` 54% inclusive, `DrawArrays` 44%, `Vulkan::Draw` 30%, then nothing above
   7% self. It is per-draw cost spread over about 1,843 draws a frame. The thread is called
   `NativeEmulation`; a report filtered on `EmuThread` returns zero samples.
+- `ValidateSurface` no longer allocates on the common path (2026-09-20). It decided whether a
+  render target needed work by materialising `invalid_regions & validate_interval` as a new
+  `boost::icl` interval set and testing that for emptiness, once for colour and once for depth on
+  every draw. The existing `Surface::IsRegionValid` is the same predicate without the allocation,
+  because `find()` on an interval set returns the first intersecting segment, so it became an
+  early return ahead of the intersection. Profile on the emulation thread at 2x with the limit at
+  200: `ValidateSurface` inclusive 5.24% to 0.93%, `GetFramebufferSurfaces` 6.61% to 2.27%, and
+  `operator new`, `malloc` and `scudo allocate` all dropped off the report. On the device the
+  overlay's command-processing figure falls from 7.2 ms to 6.6 ms and the frame from 13.35 ms to
+  12.53 ms at 2x with the limit at 100, with the picture unchanged. It buys about 1% of speed at
+  2x with the limit at 200 rather than the 4% the profile suggests, because the freed time moves
+  into GPU waiting: `swap_s` was a flat 0.26 ms and now varies between 0.05 and 0.35 ms.
