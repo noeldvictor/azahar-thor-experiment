@@ -674,6 +674,12 @@ struct Values {
     /// picture stays correct; only the speed changes.
     Setting<u32> pass_restart_every{0, Keys::pass_restart_every};
 
+    /// Gives every RGBA8 image the storage usage flag. Only shadow rendering needs it, and
+    /// on some drivers the flag turns off framebuffer compression for the image, which
+    /// makes every blended pixel cost a full read and write of main memory. Turn it off to
+    /// measure that. A title that uses shadow rendering needs it on.
+    Setting<bool> rgba8_storage_usage{true, Keys::rgba8_storage_usage};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};

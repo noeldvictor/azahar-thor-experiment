@@ -2029,3 +2029,15 @@
   that number must not be read as the GPU doing work. Treat roughly 8.3 ms per frame as the CPU
   floor at any resolution. It is why 200% at 2x needs a CPU cut as well as a GPU cut: 200% leaves
   only 8.33 ms per frame.
+- The generated fragment shaders already run at full occupancy (2026-09-19, measured with
+  `IR3_SHADER_DEBUG=fs` on the live snow field). Every fragment program reports `16 max_waves`
+  and `1 double_threadsize`, with `0 half, 6 full` registers and 16 to 20 constlen. Occupancy and
+  register pressure are not limiting anything, so do not chase them. Instruction counts are 40 to
+  176 cat2 with 0 to 15 cat5 texture fetches, which is far shorter than the 217 average recorded
+  earlier. The shaders that cover the most pixels are the short ones, which is why removing 34
+  instructions from the long lit shaders changed nothing.
+- The storage usage flag is not disabling framebuffer compression (2026-09-19). Every RGBA8 image
+  gets `eStorage`, which on some Adreno drivers turns UBWC off and would make each blended pixel a
+  full read and write of main memory. `rgba8_storage_usage` turns it off. At 3x it measures 61.70%
+  off against 61.47% on, which is no change. The earlier reasoning that an a740 keeps UBWC with
+  storage usage is now backed by a measurement.

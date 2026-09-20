@@ -252,7 +252,8 @@ FormatTraits Instance::DetermineTraits(VideoCore::PixelFormat pixel_format, vk::
     }
     // Storage flag is only needed for shadow rendering with RGBA8 texture.
     // Keeping it disables can boost performance on mobile drivers.
-    if (supports_storage && pixel_format == VideoCore::PixelFormat::RGBA8) {
+    if (supports_storage && pixel_format == VideoCore::PixelFormat::RGBA8 &&
+        Settings::values.rgba8_storage_usage.GetValue()) {
         best_usage |= vk::ImageUsageFlagBits::eStorage;
     }
 
