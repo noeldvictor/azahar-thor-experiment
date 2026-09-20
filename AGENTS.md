@@ -2554,3 +2554,28 @@
   flattens. Reaching full speed at 3x would need the effect draws to cover fewer real pixels, not
   merely be shaded more coarsely, which means rendering them into a smaller target and
   compositing once. That is the remaining idea and it is not yet tried.
+- The 1800 draws a frame are the game's, not ours (2026-09-20). Worth settling, because a draw
+  count that high invites the suspicion that the emulator is splitting or replaying work.
+  It is not: `draw_batches=553768` over `swaps=300` is 1846 guest draw batches a frame, against
+  about 1800 host draws from `ThorDrawShape`, so the ratio is one to one. `accelerated_pct=100.00`
+  and `software=0`, so nothing is falling back to a software path that would multiply draws, and
+  `accelerated_geometry=17085` over 300 swaps is 57 geometry-expanded draws a frame, which is
+  inside the 1846 rather than added to it.
+  So the snow field really is about 1846 blended batches a frame averaging 443 indices. Any fix
+  has to make each batch cheaper or cover fewer pixels; there is no emulator-side inflation to
+  remove.
+- The fix that is left, and why it keeps the picture (2026-09-20). Blend traffic is the floor:
+  coarse shading cut fragment shader invocations from 75.1 million to 25.4 and bought only 14
+  points, because every fragment still does a colour read and write through the ROP whatever rate
+  shaded it. The way to cut blending is to make the effect draws cover fewer real pixels, which
+  means rendering them into a half or quarter size scratch target and compositing once. That is
+  the standard half-resolution particle buffer every modern engine uses, and it cuts shading and
+  blending together, by four at half size.
+  It keeps the picture for the same reason it does in those engines: snow and fog are low
+  frequency and survive being drawn small, while the things that carry the art, the ink outlines
+  and the halftone screening, stay at full resolution because the rule file does not name them.
+  That is what the fingerprint layer is for, and it is also the part still unfinished: splitting
+  the 28 rules by draw count loses the outlines in both halves, so the fingerprint that owns them
+  is not yet isolated. Do that first; it is a bounded bisection with a screenshot each round.
+  The real work in the mechanism is depth: a half size effect buffer needs a downsampled depth
+  buffer to test against, since 1650 of the 1800 draws use depth.
