@@ -2163,3 +2163,18 @@
   indexed draw, is NEON with a four way unrolled body. `ShaderSetup::WriteUniformFloatRegRange`
   has an aarch64 path. xxHash is compiled with `XXH_VECTOR=XXH_NEON`; the `XXH3_hashLong_64b_default`
   symbol in a profile means the default secret, not a scalar fallback.
+- Where the unified memory argument applies, and what it is worth (2026-09-19). The copy into GPU
+  visible staging buffers is a discrete-GPU habit: on the Thor the GPU can read the pages the CPU
+  already wrote. The emulator already knows how, `RendererVulkan::TryRenderScreenshotWithHostMemory`
+  imports a host pointer with `VK_EXT_external_memory_host`, and the present path already renders
+  direct with no copy and does no readback. What is not imported is vertex data. The CPU profile
+  puts `memcpy` at 6.76% of the emulation thread, of which 40.7% comes from `SetupVertexArray`,
+  4.3% from `UploadUniforms` and 3.1% from `SetupIndexArray`: about 3% of the thread for the
+  vertex and index copies together. Importing guest memory once and binding it at an offset would
+  remove that.
+  Two things to weigh before anyone does it. It buys nothing at 2x and above, because the frame
+  is GPU bound there at 99.8% busy and the CPU has slack; it only shows at 1x, where the frame is
+  CPU bound, and would be worth roughly 3 to 4%. And the copy is not only a staging copy: it also
+  snapshots the vertex data, because the guest may rewrite that memory while the draw is still in
+  flight. A zero copy path needs the dirty region tracking to cover in-flight draws, or it will
+  corrupt geometry in games that stream vertices.
