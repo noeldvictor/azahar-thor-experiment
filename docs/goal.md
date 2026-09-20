@@ -20,6 +20,45 @@ GPU clock fell below 615 MHz is void; let it cool and repeat it.
 **Stop after 30 turns** even if the target is not met, and report what was learned. The previous
 goal had no turn cap and looped indefinitely once its target turned out to be unreachable.
 
+## Outcome, 2026-09-20, at the 30 turn cap
+
+**Not met: 74.94% against 100%.** The premise was wrong and the measurement said so early, which
+is the main thing this goal produced.
+
+The premise was that the snow field's cost is a full screen post-processing chain that could run
+below the resolution scale. It is not. A post-process quad was defined strictly, a draw that
+samples a target an earlier pass wrote, neither tests nor writes depth, at most six vertices,
+covering at least 90% of its target, and a pass counted as post only when every draw matched.
+Result: `post_passes=50/95 post_frag=2953920 (4.1%) mixed_passes=0`. Half the passes are post
+processing and they carry 4% of the frame. The other 95.4% is 1800 alpha blended draws a frame
+averaging 443 vertices, 1650 of them using depth, painting the big target: the blizzard, drawn as
+geometry. Ocarina of Time 3D reads `reads_render_target=0` and has no post chain at all, so the
+two games do not differ in post-processing; they differ in overdraw.
+
+That killed two of the three candidate mechanisms outright, because both key on identifying a
+post target. The third, variable rate shading, survived because it applies per draw, and it was
+built and measured: at 3x, no rules 60.47%, 2x2 72.61%, 4x4 74.94%, with fragment shader
+invocations falling 75.1 million to 35.8 to 25.4.
+
+**Where it stops, and why.** Fragments fall threefold at 4x4 while the frame improves by a
+quarter, and 4x4 buys two points over 2x2. Coarse shading reduces shading, not blending: every
+fragment still does a colour read and write through the ROP whatever rate shaded it. Blend
+traffic is the floor. Reaching 100% needs those draws to cover fewer real pixels, which means
+rendering them into a smaller target and compositing once. That is the one idea left and it is
+untried.
+
+**What was built and kept.** A draw targeting layer, which is the part worth having: per-title
+rules in `ShaderRules/<title id>.txt` naming materials by `PicaFSConfig::Hash()`, the same idea
+as a Dolphin graphics mod. It exists because no render state rule can do this job: "blended and
+does not write depth" caught this game's ink outlines along with its fog, since an outline and a
+sheet of fog have identical state. Default off, so the default path is bit-identical.
+
+**Open.** The coarse rate still softens the cel-shading and the fingerprint that owns the ink
+outlines is not isolated; splitting the 28 rules by draw count loses the outlines in both halves,
+so it is not a clean split. Do that before shipping the rule file for this title.
+
+---
+
 ## Why this is the goal, and why it is reachable when the last one was not
 
 The last goal asked for 3x and 4x and 200%, and three of its four rows were unreachable. This one
