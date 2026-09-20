@@ -102,3 +102,37 @@ against a Castlevania NES inject, and Project X Zone 2 against the first Project
 GBAtemp itself returns HTTP 403 to automated fetching, as does GameFAQs, so the thread has to be
 read by hand. The repository's `ActionReplay.7z` was checked in case it held a fuller set; it
 contains only the plugin binary.
+
+## Which of the 26 GBAtemp appears to have, searched 2026-09-20
+
+GBAtemp returns 403 to automated fetching, but its threads are indexed, so each gap was searched
+by title id with results restricted to gbatemp.net. **Everything in this table comes from search
+engine summaries of those pages, not from reading the pages.** Two such summaries were already
+wrong today, one about who authored a set of codes and one claiming this game runs at 30 FPS when
+the device measures 60, so treat every row as a lead to verify rather than a fact. Nothing here
+has been added to the bundled cheats.
+
+| Title | Id | Reported on GBAtemp | Form |
+| --- | --- | --- | --- |
+| Castlevania: Lords of Shadow - Mirror of Fate | `0004000000096600` | Infinite HP and MP for Alucard, enemies do no damage, 3D depth | AR text, hex quoted |
+| Code Name: S.T.E.A.M. | `0004000000132500` | 3D depth and parallax barrier | AR text, hex quoted |
+| Detective Pikachu | `00040000001C1E00` | Walk through wall on B, walk speed, Tim and Pikachu size | AR text, multipliers quoted |
+| Project X Zone 2 | `0004000000160C00` | Max gold, EXP and CP | AR text |
+| Zero Escape: Virtue's Last Reward | `0004000000096700` | Stereoscopic 3D depth | AR text |
+| Heroes of Ruin | `0004000000074000` | Infinite health, max level, gold, skill points | **Plugin**, needs conversion |
+| Mario Party: The Top 100 | `00040000001C4E00` | Infinite lives and health, unlock all minigames | **Plugin**, needs conversion |
+| Hometown Story | `00040000000F9900` | Money at save offset 0x0014 | **Save hex edit only**, no plugin found |
+
+Searched and nothing surfaced: Professor Layton and the Miracle Mask, Sonic & All-Stars Racing
+Transformed, HarmoKnight, Yu-Gi-Oh Saikyou Card Battle. One incidental finding worth keeping:
+HarmoKnight is reported to crash when a cheat plugin is enabled.
+
+Not yet searched, fourteen of them, mostly eShop titles and art applications where a cheat is
+unlikely to exist: Art Academy, Attack of the Friday Monsters, Cave Story 3D, Crimson Shroud,
+Doctor Lautrec, Jake Hunter, Mario Sports Superstars, Petit Novel series, Pokemon Art Academy,
+Professor Layton and the Azran Legacy, Rayman 3D, Return to PoPoLoCrois, The Starship Damrey,
+Weapon Shop de Omasse.
+
+A plugin is a `.plg` binary rather than Azahar text cheats, so those two rows cannot be bundled
+without converting them first.
+
