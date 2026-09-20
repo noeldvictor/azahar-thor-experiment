@@ -2140,3 +2140,12 @@
   is 99.8% busy there and a CPU saving cannot show. Keep it: it is strictly less work and it will
   matter more on Thor Lite. The three PICA tables do not share a layout, so read the union in
   `pica_core.h` before touching a converter; proctex, lighting and fog each pack differently.
+- Write-combined upload memory beats cached, measured (2026-09-19, reverted). The stream, uniform
+  and texel buffers ask for `eDeviceLocal | eHostVisible | eHostCoherent` and never for
+  `eHostCached`, which looked like an oversight: on an ARM part a coherent type that is not cached
+  is Normal Non-Cacheable, so every CPU store goes straight to the bus, and the hottest CPU work
+  in the frame writes here. This device does offer a cached coherent type and the driver logs
+  confirm it was taken. It is slower: 115.27% against 120.43% at 2x with the frame limit at 200,
+  a 4% regression. The GPU reads these buffers, so a cached type makes the driver do cache
+  maintenance that costs more than the faster stores save. The original choice is correct. Do not
+  add `eHostCached` to an upload or stream buffer.
