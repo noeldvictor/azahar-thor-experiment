@@ -111,6 +111,9 @@ private:
     /// Counts fragment shader invocations per render pass, which is the only way to see how
     /// much of the frame is overdraw.
     vk::UniqueQueryPool fragment_pool;
+    /// The render area of the pass that owns each query slot, recorded when the query
+    /// begins so a fragment count can be attributed to the right target size.
+    std::vector<std::pair<u32, u32>> slot_area;
 };
 
 } // namespace Vulkan

@@ -133,6 +133,11 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
         });
     }
     if (timestamp_index < MaxTimedPasses) {
+        if (slot_area.size() <= timestamp_index) {
+            slot_area.resize(timestamp_index + 1);
+        }
+        slot_area[timestamp_index] = {new_pass.render_area.extent.width,
+                                      new_pass.render_area.extent.height};
         scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
                           slot = timestamp_index](vk::CommandBuffer cmdbuf) {
             cmdbuf.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, pool, slot * 2);
@@ -243,18 +248,30 @@ void RenderManager::ReportPassTrace() {
             // and one that shades close to its area for a single draw is covering the whole
             // surface including any padding the screen never shows.
             std::vector<std::pair<u64, std::size_t>> by_frags;
-            for (u32 i = 0; i < timed && i < pass_trace.size(); i++) {
+            for (u32 i = 0; i < timed && i < slot_area.size(); i++) {
                 by_frags.emplace_back(frags[i], i);
             }
             std::sort(by_frags.begin(), by_frags.end(),
                       [](const auto& a, const auto& b) { return a.first > b.first; });
             std::string heavy;
-            for (std::size_t i = 0; i < by_frags.size() && i < 6; i++) {
-                const TracedPass& entry = pass_trace[by_frags[i].second];
-                heavy += fmt::format("{}x{}:{}draws:{}frag ", entry.width, entry.height,
-                                     entry.draws, by_frags[i].first);
+            u64 big_target_frags = 0;
+            u64 small_target_frags = 0;
+            for (u32 i = 0; i < timed && i < slot_area.size(); i++) {
+                const auto [w, h] = slot_area[i];
+                // Split the frame between the passes that draw the scene and the small passes
+                // of the downsample chain, so it is clear which one owns the fragment count.
+                if (static_cast<u64>(w) * h >= 262144ull) {
+                    big_target_frags += frags[i];
+                } else {
+                    small_target_frags += frags[i];
+                }
             }
-            LOG_INFO(Render_Vulkan, "ThorHeavyPasses {}", heavy);
+            for (std::size_t i = 0; i < by_frags.size() && i < 6; i++) {
+                const auto [w, h] = slot_area[by_frags[i].second];
+                heavy += fmt::format("{}x{}:{}frag ", w, h, by_frags[i].first);
+            }
+            LOG_INFO(Render_Vulkan, "ThorHeavyPasses big={} small={} top={}", big_target_frags,
+                     small_target_frags, heavy);
             // Fragment shader invocations for the whole frame. Divide by the pixels on screen to
             // get the overdraw factor, which is the number that says whether the scene can ever
             // fit in the frame budget.

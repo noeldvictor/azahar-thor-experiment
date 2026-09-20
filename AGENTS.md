@@ -2234,3 +2234,13 @@
   One caveat when reading `ThorHeavyPasses`: the dimensions lag the fragment counts by one entry,
   because a pass is recorded in the trace when the next pass begins and the last pass of a frame
   is recorded after the trace was cleared. Trust the counts and the totals, not the pairing.
+- The fragments are in the scene, not the effect buffers (2026-09-20). With each query slot
+  paired to the render area of the pass that owns it, one frame at 2x splits 31,393,956 fragments
+  into targets of 512x1024 and only 1,488,960 into everything smaller, so 95.5% of the work is the
+  main scene target and 4.5% is the downsample chain. The six heaviest passes are all 512x1024 at
+  about 2.37 million fragments each.
+  This closes the last open option. Not scaling the effect and blur buffers with resolution is the
+  standard way to cut fragments without touching the scene, and here it is worth at most 4.5%.
+  Cutting the rest means reducing work in the main target, which is the thing resolution scaling
+  exists to do, so at 3x and 4x it is the same as lowering the resolution. There is no fragment
+  reduction available that keeps the picture and the resolution.
