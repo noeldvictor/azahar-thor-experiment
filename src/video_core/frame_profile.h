@@ -96,6 +96,11 @@ enum class FrameProfileEvent : u32 {
     TextureAliasesAttachment,
     /// A draw whose pipeline differs from the one the previous draw used.
     PipelineChanges,
+    /// A draw that samples an image an earlier pass of the same frame rendered into. These
+    /// are the real read-after-write edges, and they are what stops passes being grouped.
+    DrawReadsRenderTarget,
+    /// A pass that contains at least one such draw.
+    PassReadsRenderTarget,
     Count,
 };
 

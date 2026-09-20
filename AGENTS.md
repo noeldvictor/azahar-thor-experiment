@@ -2323,3 +2323,22 @@
   present, so its cost does not scale with the scene. Two operating points follow: 2x with GSR for
   full speed, and 3x with GSR for the closest thing to native on this panel. Recommend GSR on any
   Thor profile; there is no measured reason to leave it off.
+- The passes cannot be grouped, measured (2026-09-20). Grouping or reordering passes was the
+  precondition for making tiling pay, so the read-after-write edges were counted directly: a draw
+  that samples an image an earlier pass of the same frame rendered into is a real dependency.
+  At 3x the snow field runs 154 such draws per frame, and 82 of its 97 passes contain at least
+  one. So 84% of passes depend on an earlier pass's output and cannot be moved. The tiling rework
+  is dead, and with it the last structural idea in this ledger.
+  The arithmetic also explains why tiling loses without needing the dependency argument: the game
+  returns to the big target about 30 times per frame, and in tiled mode each visit pays a load and
+  a store of a 1.18 Mpix target at 3x, which is more traffic than keeping the blend in memory
+  costs. `DrawReadsRenderTarget` and `PassReadsRenderTarget` in the profiling build print this.
+- Nothing is being widened, and depth retention is not a bandwidth cost (2026-09-20). The snow
+  field's targets are RGBA8 with D24S8 depth, logged by `ThorViewport`, which is what the guest
+  asked for rather than a promotion. `kRetainDepthAttachment` only keeps an unused attachment
+  bound so the pass does not restart; those draws neither test nor write depth, so it adds no
+  per-fragment traffic on the direct path.
+  What is left is plain blending bandwidth. At 3x the scene shades about 72 million fragments per
+  frame, most of them blended, which is a colour read and a colour write each: 576 MB per frame
+  before depth or textures, or roughly 22 GB/s at 38 frames per second against a part whose usable
+  bandwidth is in the tens of GB/s. UBWC is already halving part of that and is worth 12%.

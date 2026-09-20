@@ -58,6 +58,8 @@ void RenderManager::BeginRendering(const Framebuffer* framebuffer,
     }
     images = framebuffer->Images();
     aspects = framebuffer->Aspects();
+    MarkWritten(images[0]);
+    pass_read_target = false;
     shadow_rendering = framebuffer->shadow_rendering;
     BeginRendering(new_pass);
 }
@@ -160,6 +162,28 @@ void RenderManager::BeginRendering(const RenderPass& new_pass) {
     pass = new_pass;
 }
 
+void RenderManager::MarkWritten(vk::Image image) {
+    if (!image) {
+        return;
+    }
+    if (std::find(written_this_frame.begin(), written_this_frame.end(), image) ==
+        written_this_frame.end()) {
+        written_this_frame.push_back(image);
+    }
+}
+
+bool RenderManager::WasWrittenThisFrame(vk::Image image) const {
+    return image && std::find(written_this_frame.begin(), written_this_frame.end(), image) !=
+                        written_this_frame.end();
+}
+
+void RenderManager::NotePassReadsTarget() {
+    if (!pass_read_target) {
+        pass_read_target = true;
+        VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::PassReadsRenderTarget);
+    }
+}
+
 void RenderManager::ReportPassTrace() {
 #if !THOR_FRAME_PROFILING
     return;
@@ -169,6 +193,7 @@ void RenderManager::ReportPassTrace() {
         // The trace holds one frame, so the query slots must start again with it. Without this
         // the slot numbers run on across frames and no longer name the pass they measured.
         pass_trace.clear();
+        written_this_frame.clear();
         if (timestamp_pool && fragment_pool && timestamp_index != 0) {
             scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
                               used = timestamp_index](vk::CommandBuffer cmdbuf) {

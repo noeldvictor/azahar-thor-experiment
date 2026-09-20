@@ -872,9 +872,12 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         if (draw_rect.GetArea() >= 262144u && now - last_viewport_log > std::chrono::seconds{1}) {
             last_viewport_log = now;
             LOG_INFO(Render_Vulkan,
-                     "ThorViewport draw_rect={}x{} viewport={}x{} at {},{} fb={}x{}",
+                     "ThorViewport draw_rect={}x{} viewport={}x{} at {},{} fb={}x{} "
+                     "color={} depth={}",
                      draw_rect.GetWidth(), draw_rect.GetHeight(), viewport.width, viewport.height,
-                     viewport.x, viewport.y, framebuffer->Width(), framebuffer->Height());
+                     viewport.x, viewport.y, framebuffer->Width(), framebuffer->Height(),
+                     VideoCore::PixelFormatAsString(framebuffer->Format(SurfaceType::Color)),
+                     VideoCore::PixelFormatAsString(framebuffer->Format(SurfaceType::Depth)));
         }
     }
 #endif
@@ -991,6 +994,10 @@ void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {
 
         // Bind the texture provided by the rasterizer cache
         Surface& surface = res_cache.GetTextureSurface(texture);
+        if (renderpass_cache.WasWrittenThisFrame(surface.Image())) {
+            VideoCore::AddFrameProfileEvent(VideoCore::FrameProfileEvent::DrawReadsRenderTarget);
+            renderpass_cache.NotePassReadsTarget();
+        }
         Sampler& sampler = res_cache.GetSampler(texture.config);
         // A draw that samples its own colour target forces the driver to flush between draws.
         if (framebuffer != nullptr && surface.Image() == framebuffer->Images()[0]) {

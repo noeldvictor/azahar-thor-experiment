@@ -70,6 +70,12 @@ public:
     /// Logs the render pass sequence of one frame, at most once per second. Diagnostic only.
     void ReportPassTrace();
 
+    /// Records that this frame has rendered into an image, and answers whether it has.
+    /// Used to find the read-after-write edges between passes.
+    void MarkWritten(vk::Image image);
+    [[nodiscard]] bool WasWrittenThisFrame(vk::Image image) const;
+    void NotePassReadsTarget();
+
     /// Counts draws since the last forced pass restart. See Settings pass_restart_every.
     u32 draws_since_forced_restart{};
 
@@ -114,6 +120,9 @@ private:
     /// The render area of the pass that owns each query slot, recorded when the query
     /// begins so a fragment count can be attributed to the right target size.
     std::vector<std::pair<u32, u32>> slot_area;
+    /// Images this frame has rendered into, and whether the open pass has read one.
+    std::vector<vk::Image> written_this_frame;
+    bool pass_read_target{};
 };
 
 } // namespace Vulkan
