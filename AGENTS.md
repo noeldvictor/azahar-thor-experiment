@@ -2223,3 +2223,14 @@
   680, 615, 550, 475, 401, 348, 295, 220 and 124.8 MHz, and `max_freq` is 680 MHz. Every
   measurement in the ledger was taken at the top of that table, so there is no clock headroom
   being left unused and the governor is not holding the part back.
+- What the GPU actually achieves per fragment (2026-09-20). With the query slots aligned, one
+  frame at 2x in the snow field is 95 render passes, 34.1 million fragment shader invocations and
+  13.28 ms of summed pass time. That is 0.39 ns per fragment, or 0.27 GPU cycles at 680 MHz,
+  which is 3.8 fragments per clock. The heaviest passes run about 0.92 ms and shade about 2.5
+  million fragments each, and six of them are 41% of the frame. For shaders of roughly a hundred
+  instructions with a texture fetch and a blend, 3.8 fragments per clock is a normal result on
+  this part, not a sign of anything being left on the table. The frame is expensive because the
+  scene asks for 34 million fragments, not because each one is handled badly.
+  One caveat when reading `ThorHeavyPasses`: the dimensions lag the fragment counts by one entry,
+  because a pass is recorded in the trace when the next pass begins and the last pass of a frame
+  is recorded after the trace was cleared. Trust the counts and the totals, not the pairing.
