@@ -14,10 +14,10 @@ Cheat source: `/storage/emulated/0/Azaharuser/cheats`
 | --- | --- |
 | ROMs with a title id read from the header | 104 |
 | Cheat files on the device | 637 |
-| Library titles **with** a cheat file | 78 |
-| Library titles **without** | 26 |
+| Library titles **with** a cheat file | 79 |
+| Library titles **without** | 25 |
 | Present but effectively empty | 1 |
-| Bundled in the APK | 8 |
+| Bundled in the APK | 9 |
 
 Most of the device's 637 cheat files are for titles not in this library, so the useful number is
 the 26 below rather than the raw total.
@@ -28,7 +28,6 @@ the 26 below rather than the raw total.
 | --- | --- |
 | `0004000000095800` | Art Academy - Lessons for Everyone |
 | `00040000000E7600` | Attack of the Friday Monsters A Tokyo Tale (USA) (eShop) |
-| `0004000000096600` | Castlevania - Lords of Shadow - Mirror of Fate (USA) (En,Fr,Es) |
 | `000400000004D200` | Cave Story 3D |
 | `0004000000132500` | Code Name - S.T.E.A.M. |
 | `00040000000BBF00` | Crimson Shroud |
@@ -135,4 +134,20 @@ Weapon Shop de Omasse.
 
 A plugin is a `.plg` binary rather than Azahar text cheats, so those two rows cannot be bundled
 without converting them first.
+
+## Closed since the scan
+
+| Title | Id | What was added |
+| --- | --- | --- |
+| Castlevania: Lords of Shadow - Mirror of Fate (USA) | `0004000000096600` | Infinite MP, infinite Hearts, Speed x2, ported to USA by NanashiFinal13 on GBAtemp. No HP code exists for this build; that is what his post was asking for. |
+
+Rejected rather than added, and why, so the same paste is not reconsidered later:
+
+- **Project X Zone 2.** The GBAtemp post carrying gold, EXP, CP and item codes is headed
+  "Brave New World", the Japanese title, with Japanese descriptions, and the poster is asking for
+  them to be converted to Gateway format rather than publishing working ones. This library has the
+  WORLD build, `0004000000160C00`, so the addresses would not match even if the codes were
+  confirmed.
+- **Castlevania `[SEL+UP Infinite HP]` and its block.** Those are the non-USA codes the author
+  wanted ported from, not to.
 
