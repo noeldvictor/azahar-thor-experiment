@@ -420,6 +420,22 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
             cmdbuf.setScissor(0, scissor);
         }
 
+        if (instance.IsFragmentShadingRateSupported() &&
+            (dynamic.shading_rate_width != current_dynamic.shading_rate_width ||
+             dynamic.shading_rate_height != current_dynamic.shading_rate_height || is_dirty)) {
+            const vk::Extent2D size = {
+                .width = static_cast<u32>(dynamic.shading_rate_width),
+                .height = static_cast<u32>(dynamic.shading_rate_height),
+            };
+            // Keep the pipeline rate and ignore the per-primitive and attachment sources, which
+            // we do not use. Both combiners therefore pass the pipeline rate straight through.
+            const std::array<vk::FragmentShadingRateCombinerOpKHR, 2> combiners = {
+                vk::FragmentShadingRateCombinerOpKHR::eKeep,
+                vk::FragmentShadingRateCombinerOpKHR::eKeep,
+            };
+            cmdbuf.setFragmentShadingRateKHR(&size, combiners.data());
+        }
+
         if (dynamic.stencil_compare_mask != current_dynamic.stencil_compare_mask || is_dirty) {
             cmdbuf.setStencilCompareMask(vk::StencilFaceFlagBits::eFrontAndBack,
                                          dynamic.stencil_compare_mask);

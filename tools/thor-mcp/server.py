@@ -961,6 +961,159 @@ def _perf_report(data: Path, thread: str = "", top: int = 40) -> str:
     return chr(10).join(lines[: top + 6]) or done.stderr.strip()
 
 
+@mcp.tool()
+def bench(
+    title_id: str = "0004000000053700",
+    rom_path: str = "",
+    slot: int = 5,
+    samples: int = 8,
+    settle_seconds: int = 12,
+    boot_seconds: int = 32,
+    name: str = "",
+) -> dict:
+    """Launch a title, load a save state, take perf samples and a screenshot in one call.
+
+    This is the measurement loop the optimization work repeats dozens of times: launch, wait for
+    boot, load the gameplay save state, let it settle, sample perf_stats, capture the scene and
+    the GPU clock. Doing it here rather than in a throwaway script means every run has the same
+    shape and the same guards, and a result can be compared against an earlier one.
+
+    Returns the mean and minimum speed, the frame time split, the GPU clock range over the run
+    (a run that dipped below 615 MHz was throttling and is void), and the screenshot path."""
+    if not rom_path:
+        rom_path = _rom_for_title(title_id)
+    launch(rom_path=rom_path, wait_seconds=boot_seconds)
+    loaded = json.loads(emu_command("load_state", str(slot), 30))
+    time.sleep(settle_seconds)
+    rows: list[dict] = []
+    clocks: list[int] = []
+    for _ in range(max(samples, 1)):
+        payload = json.loads(emu_command("perf"))
+        if "perf" in payload:
+            rows.append(payload["perf"])
+        clocks.append(_gpu_clock_mhz())
+        time.sleep(1.0)
+    shot = screenshot(name=name or f"bench-{title_id}-slot{slot}")
+    if not rows:
+        return {"error": "no perf samples", "loaded": loaded.get("loaded"), "screenshot": shot}
+    speeds = [row["speed_percent"] for row in rows]
+    valid = [c for c in clocks if c > 0]
+    return {
+        "loaded": loaded.get("loaded"),
+        "samples": len(rows),
+        "speed_mean": round(sum(speeds) / len(speeds), 2),
+        "speed_min": round(min(speeds), 2),
+        "fps_mean": round(sum(r["game_fps"] for r in rows) / len(rows), 2),
+        "frame_ms": round(sum(r["frame_time_s"] for r in rows) / len(rows), 2),
+        "swap_ms": round(sum(r["swap_s"] for r in rows) / len(rows), 2),
+        "gpu_cmd_ms": round(sum(r["gpu_cmd_s"] for r in rows) / len(rows), 2),
+        "gpu_mhz_min": min(valid) if valid else -1,
+        "gpu_mhz_max": max(valid) if valid else -1,
+        "throttled": bool(valid and min(valid) < 615),
+        "screenshot": shot,
+    }
+
+
+@mcp.tool()
+def shader_rules(title_id: str = "0004000000053700", rules: str = "") -> dict:
+    """Read or set the per-title coarse shading rules, the draw targeting layer.
+
+    `rules` is comma separated "<fragment shader fingerprint>:<rate>" pairs, for example
+    "0F2EB3DDB971554B:2, 725FE625080ECDA8:4", where the rate is 2 for 2x2 blocks or 4 for 4x4.
+    Pass an empty string to clear them. Get the fingerprints from `shader_use`.
+
+    This is the same idea as a Dolphin graphics mod: name the exact material rather than letting
+    the emulator guess from render state. Render state cannot tell an ink outline from a sheet of
+    fog, so a blanket rule softens the art along with the effect; a fingerprint can.
+    Takes effect on the next launch, with no rebuild."""
+    remote = f"{USER_DIR}/GameSettings/{title_id.upper()}.ini"
+    before = game_settings_read(title_id)
+    if rules == "__read__":
+        for line in before.splitlines():
+            if line.strip().startswith("shader_shading_rules"):
+                return {"file": remote, "rules": line.split("=", 1)[-1].strip()}
+        return {"file": remote, "rules": ""}
+    _require_stopped(False)
+    if "shader_shading_rules" in before:
+        after = re.sub(r"shader_shading_rules = .*", f"shader_shading_rules = {rules}", before)
+    else:
+        after = before.rstrip() + f"{chr(10)}shader_shading_rules = {rules}{chr(10)}"
+    _write_remote_text(remote, after)
+    return {"file": remote, "rules": rules}
+
+
+@mcp.tool()
+def shader_use(top: int = 16) -> dict:
+    """Return the fragment shader fingerprints the running frame spends its draws on.
+
+    Needs a profiling build, which emits ThorShaderUse. Each entry is a fingerprint, how many
+    draws used it, and how many of those draws got a coarse shading rate. These are the names a
+    `shader_rules` entry targets. Draw count is not cost: a shader with many cheap draws can
+    matter less than one with a few draws covering the screen, so rank candidates by measuring
+    with `bench`, not by this count alone."""
+    text = _sh("logcat -d | grep ThorShaderUse | tail -1", timeout=120)
+    if "ThorShaderUse" not in text:
+        return {"error": "no ThorShaderUse line; is this a profiling build and a game running?"}
+    body = text.split("ThorShaderUse", 1)[-1]
+    entries = []
+    for token in body.split():
+        if ":" in token and "draws" in token:
+            fingerprint, rest = token.split(":", 1)
+            draws, _, coarse = rest.partition("/")
+            entries.append(
+                {
+                    "fingerprint": fingerprint,
+                    "draws": int(draws.replace("draws", "") or 0),
+                    "coarse_draws": int(coarse.replace("coarse", "") or 0),
+                }
+            )
+    return {"count": len(entries), "shaders": entries[:top]}
+
+
+def _gpu_clock_mhz() -> int:
+    try:
+        return int(_sh("cat /sys/class/kgsl/kgsl-3d0/gpuclk").strip()) // 1000000
+    except Exception:
+        return -1
+
+
+def _rom_for_title(title_id: str) -> str:
+    """Map a title id to its ROM under the granted tree by reading the zcci headers once.
+
+    A .zcci is a 0x60 byte Z3DS header followed by zstd frames of 256 KiB, so the first frame
+    decompresses to the NCSD header and the media id sits at offset 0x108."""
+    global _TITLE_MAP
+    if _TITLE_MAP is None:
+        _TITLE_MAP = {}
+        try:
+            import zstandard as zstd
+        except ImportError:
+            return ""
+        listing = _sh(f"ls -1 '{ROM_DIR}'", timeout=120)
+        for name in [n.strip() for n in listing.splitlines() if n.strip().endswith(".zcci")]:
+            try:
+                blob = _adb(
+                    ["-s", _serial(), "exec-out", f"dd if='{ROM_DIR}/{name}' bs=65536 count=5"],
+                    timeout=90,
+                    binary=True,
+                )
+                start = blob.find(bytes.fromhex("28b52ffd"))
+                if start < 0:
+                    continue
+                head = zstd.ZstdDecompressor().decompressobj().decompress(blob[start:])
+                if head[0x100:0x104] != b"NCSD":
+                    continue
+                _TITLE_MAP["%016X" % int.from_bytes(head[0x108:0x110], "little")] = name
+            except Exception:
+                continue
+    name = _TITLE_MAP.get(title_id.upper(), "")
+    return f"{ROM_DIR}/{name}" if name else ""
+
+
+_TITLE_MAP: dict[str, str] | None = None
+ROM_DIR = os.environ.get("THOR_ROM_DIR", "/storage/2664-21DE/Roms/n3ds/zcci")
+
+
 def _main() -> None:
     if "--list-tools" in sys.argv:
         for tool in asyncio.run(mcp.list_tools()):

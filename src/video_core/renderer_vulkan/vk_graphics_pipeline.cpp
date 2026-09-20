@@ -208,11 +208,17 @@ bool GraphicsPipeline::Build(bool fail_on_compile_required) {
         .pScissors = &scissor,
     };
 
-    boost::container::static_vector<vk::DynamicState, 14> dynamic_states = {
+    boost::container::static_vector<vk::DynamicState, 16> dynamic_states = {
         vk::DynamicState::eViewport,           vk::DynamicState::eScissor,
         vk::DynamicState::eStencilCompareMask, vk::DynamicState::eStencilWriteMask,
         vk::DynamicState::eStencilReference,   vk::DynamicState::eBlendConstants,
     };
+
+    // The coarse shading rate is set per draw, so it is dynamic state rather than a pipeline
+    // permutation. Without this the rate would have to be baked into every pipeline variant.
+    if (instance.IsFragmentShadingRateSupported()) {
+        dynamic_states.push_back(vk::DynamicState::eFragmentShadingRateKHR);
+    }
 
     if (instance.IsExtendedDynamicStateSupported()) {
         constexpr std::array extended = {

@@ -685,6 +685,12 @@ struct Values {
     /// multiply per stage, on colour and on alpha, which is a large share of a short
     /// shader. Turning it off is an accuracy trade: compare the screenshots.
     Setting<bool> accurate_tev_rounding{true, Keys::accurate_tev_rounding};
+    // Coarse shading rate for blended draws, as a power of two per axis: 1 is off, 2 is a 2x2
+    // block, 4 is a 4x4 block. Helps a title whose frame is mostly large blended effects.
+    Setting<u32> blended_shading_rate{1, Keys::blended_shading_rate};
+    // Per-title draw rules, the targeting layer. Comma separated "<fs hash>:<rate>" pairs, for
+    // example "a1b2c3d4e5f60718:2". Empty means no rules and the core guesses nothing.
+    Setting<std::string> shader_shading_rules{"", Keys::shader_shading_rules};
 
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};

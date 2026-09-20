@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <array>
+
 #include <vector>
 #include <chrono>
 #include <mutex>
@@ -85,6 +87,10 @@ public:
     void NoteDrawShape(bool samples_rt, bool depth_used, bool small_vertex_count, bool full_cover,
                        bool blended, u32 vertices);
 
+    /// Vertex-count histogram for the draws the coarse shading heuristic would catch, so the
+    /// big simple effect sheets can be told apart from detailed blended meshes such as outlines.
+    void NoteCoarseCandidate(u32 vertices);
+
     /// Counts draws since the last forced pass restart. See Settings pass_restart_every.
     u32 draws_since_forced_restart{};
 
@@ -137,6 +143,7 @@ private:
     u32 shape_draws{}, shape_samples_rt{}, shape_depth{}, shape_quad{}, shape_cover{},
         shape_blended{};
     u64 shape_vertices{};
+    std::array<u32, 5> coarse_verts{};
     u32 pass_total_draws{};
     /// Images this frame has rendered into, and whether the open pass has read one.
     std::vector<vk::Image> written_this_frame;

@@ -100,6 +100,15 @@ public:
     /// Binds a fragment shader generated from PICA state
     void UseFragmentShader(const Pica::RegsInternal& regs, const Pica::Shader::UserConfig& user);
 
+    /// Fingerprint of the fragment shader the next draw will use. It is the hash of the PICA
+    /// combiner, lighting, fog and alpha test configuration, so two materials that look
+    /// different have different values even when their render state is identical. This is what
+    /// a per-title rule targets, the way a Dolphin graphics mod targets a texture hash.
+    u64 CurrentFragmentShaderHash() const {
+        return shader_hashes[static_cast<std::size_t>(
+            Pica::Shader::Generator::ProgramType::FS)];
+    }
+
     /// Gets the current program ID
     u64 GetProgramID() const {
         return current_program_id;

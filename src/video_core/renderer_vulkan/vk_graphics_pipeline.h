@@ -272,6 +272,10 @@ struct DynamicPipelineInfo {
     Common::Rectangle<u32> scissor;
     Common::Rectangle<s32> viewport;
     /// The PICA depth transform, moved out of the fragment shader into fixed function.
+    // Coarse shading rate for this draw, 1 means one fragment per pixel. Only 1, 2 and 4 are
+    // legal, and the a740 advertises 1x1, 1x2, 2x1, 2x2, 4x2 and 4x4.
+    u8 shading_rate_width = 1;
+    u8 shading_rate_height = 1;
     float min_depth = 0.f;
     float max_depth = 1.f;
 

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <vector>
 #include <unordered_map>
 #include "video_core/shader/geometry_expand.h"
@@ -155,6 +157,17 @@ private:
     bool gs_uniforms_valid{};
     // Set during SyncTextureUnits when any bound texture is a target an earlier pass wrote.
     bool draw_samples_render_target{};
+    /// Per-title draw rules: fragment shader fingerprint to coarse shading rate. Parsed from
+    /// Settings::values::shader_shading_rules, which a per-title ini supplies.
+    void ReloadShadingRules();
+    u8 ShadingRateForShader(u64 fs_hash) const;
+    void NoteShaderUse(u64 fs_hash, u8 rate);
+    void ReportShaderUse();
+    std::string shading_rules_text{"ÿ"};
+    std::unordered_map<u64, u8> shading_rules;
+    // hash -> {draws, draws that got a coarse rate}. Recording the last rate seen
+    // instead of counting hid that one shader serves both coarse and sharp draws.
+    std::unordered_map<u64, std::pair<u32, u32>> shader_use;
     PAddr pass_color_addr{};
     PAddr pass_depth_addr{};
     bool geometry_expand_draw{};

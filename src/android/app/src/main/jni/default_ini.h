@@ -454,6 +454,39 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 0: Off, 1 (default): On
 )") DECLARE_KEY(accurate_tev_rounding) BOOST_HANA_STRING(R"(
 
+# Shades large blended effects in blocks instead of per pixel, using the GPU's variable rate
+# shading. It only changes how finely the effects themselves are computed; geometry, text and
+# the sharpness of the picture are untouched, and the render target stays at full resolution.
+#
+# Which games this helps: ones whose frame is mostly big blended effects rather than one pass of
+# scenery. E.X. Troopers is the clear case, where a blizzard of blended snow and fog meshes
+# covers the screen about 58 times over. Kid Icarus Uprising, Resident Evil Revelations and
+# Monster Hunter have heavy effect layers too. A game that draws its scene once, such as Ocarina
+# of Time 3D or a 2D game, has almost nothing for this to work on: it costs nothing and gains
+# nothing there, so leave it off.
+#
+# The trade is that an effect computed in 2x2 or 4x4 blocks is softer up close. Raising the
+# resolution and turning this on is usually a better picture than lowering the resolution.
+# 1 (default): Off, 2: 2x2 blocks, 4: 4x4 blocks
+)") DECLARE_KEY(blended_shading_rate) BOOST_HANA_STRING(R"(
+
+# Per-draw rules, the precise version of the setting above. Instead of guessing from render
+# state, this names the exact materials to shade coarsely by their fragment shader fingerprint,
+# the way a Dolphin graphics mod names a texture hash.
+#
+# Format: comma separated <fingerprint>:<rate> pairs, for example
+#   shader_shading_rules = a1b2c3d4e5f60718:2, 00112233445566aa:4
+# Rate is 2 for 2x2 blocks or 4 for 4x4. A draw whose fingerprint is not listed is untouched.
+#
+# To find the fingerprints, run a profiling build and read the ThorShaderUse lines in the log:
+# they list the shaders the frame actually spends its draws on. Enable one at a time and look at
+# the screen. This exists because render state alone cannot tell a soft effect from a sharp one:
+# an ink outline and a sheet of fog can both be blended geometry that does not write depth, so a
+# blanket rule softens the art along with the effect. A fingerprint tells them apart.
+#
+# When this is set it takes precedence and the blanket setting above is ignored.
+)") DECLARE_KEY(shader_shading_rules) BOOST_HANA_STRING(R"(
+
 # Dumps textures as PNG to dump/textures/[Title ID]/.
 # 0 (default): Off, 1: On
 )") DECLARE_KEY(dump_textures) BOOST_HANA_STRING(R"(

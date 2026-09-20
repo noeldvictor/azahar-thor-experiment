@@ -744,6 +744,10 @@ void RasterizerVulkan::DrawTriangles() {
 bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
     draw_samples_render_target = false;
+    // Cheap: a string compare against the text already parsed. Picks up an edited per-title rule
+    // file on the next launch without a rebuild, which is the point of keeping rules out of code.
+    ReloadShadingRules();
+    ReportShaderUse();
 {
         VideoCore::ScopedFrameProfileTimer timer{
             VideoCore::FrameProfileEvent::DrawSyncStateNanoseconds};
@@ -863,6 +867,29 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
                            regs.pipeline.num_vertices <= 6 && framebuffer_rect.GetArea() > 0 &&
                            static_cast<u64>(draw_rect.GetArea()) * 10 >=
                                static_cast<u64>(framebuffer_rect.GetArea()) * 9;
+    // Coarse shading, chosen per draw. A rule names the exact material by its fragment shader
+    // fingerprint, which is the only thing that separates a sheet of fog from an ink outline:
+    // both are blended geometry that does not write depth, so a rule based on render state
+    // softens the art along with the effect. Measured: a blanket rule at 2x2 took this scene
+    // from 60.47% to 72.97% and removed the cel-shading outlines with it.
+    // The blanket setting stays as a crude fallback for someone without fingerprints to hand.
+    u8 rate = 1;
+    if (instance.IsFragmentShadingRateSupported()) {
+        const u64 fs_hash = pipeline_cache.CurrentFragmentShaderHash();
+        if (const u8 ruled = ShadingRateForShader(fs_hash); ruled > 1) {
+            rate = ruled;
+        } else if (shading_rules.empty()) {
+            const u32 requested_rate = Settings::values.blended_shading_rate.GetValue();
+            if (requested_rate > 1 && regs.framebuffer.output_merger.alphablend_enable != 0 &&
+                !write_depth_fb) {
+                rate = static_cast<u8>(requested_rate == 4 ? 4 : 2);
+            }
+        }
+        NoteShaderUse(fs_hash, rate);
+    }
+    pipeline_info.dynamic_info.shading_rate_width = rate;
+    pipeline_info.dynamic_info.shading_rate_height = rate;
+
     renderpass_cache.NoteDrawPostQuad(post_quad);
     renderpass_cache.NoteDrawShape(draw_samples_render_target, depth_used,
                                    regs.pipeline.num_vertices <= 6,
@@ -942,6 +969,79 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
 
     vertex_batch.clear();
     return succeeded;
+}
+
+void RasterizerVulkan::ReloadShadingRules() {
+    const std::string& text = Settings::values.shader_shading_rules.GetValue();
+    if (text == shading_rules_text) {
+        return;
+    }
+    shading_rules_text = text;
+    shading_rules.clear();
+    // "<16 hex digits>:<rate>" pairs separated by commas. Anything unparsable is skipped with a
+    // warning rather than failing the frame, because this file is hand edited.
+    std::size_t pos = 0;
+    while (pos < text.size()) {
+        const std::size_t end = text.find(',', pos);
+        std::string item = text.substr(pos, end == std::string::npos ? end : end - pos);
+        pos = (end == std::string::npos) ? text.size() : end + 1;
+        const std::size_t colon = item.find(':');
+        if (colon == std::string::npos) {
+            continue;
+        }
+        try {
+            const u64 hash = std::stoull(item.substr(0, colon), nullptr, 16);
+            const u32 rate = static_cast<u32>(std::stoul(item.substr(colon + 1)));
+            if (rate == 2 || rate == 4) {
+                shading_rules.emplace(hash, static_cast<u8>(rate));
+            } else {
+                LOG_WARNING(Render_Vulkan, "Shading rule for {:016X} has rate {}, expected 2 or 4",
+                            hash, rate);
+            }
+        } catch (const std::exception&) {
+            LOG_WARNING(Render_Vulkan, "Could not read shading rule '{}'", item);
+        }
+    }
+    LOG_INFO(Render_Vulkan, "Loaded {} shading rules", shading_rules.size());
+}
+
+u8 RasterizerVulkan::ShadingRateForShader(u64 fs_hash) const {
+    const auto it = shading_rules.find(fs_hash);
+    return it == shading_rules.end() ? u8{1} : it->second;
+}
+
+void RasterizerVulkan::NoteShaderUse(u64 fs_hash, u8 rate) {
+#if THOR_FRAME_PROFILING
+    auto& entry = shader_use[fs_hash];
+    entry.first++;
+    if (rate > 1) {
+        entry.second++;
+    }
+#endif
+}
+
+void RasterizerVulkan::ReportShaderUse() {
+#if THOR_FRAME_PROFILING
+    // The shaders the frame actually spends its draws on, most used first, with the rate each
+    // one is currently getting. These are the fingerprints a per-title rule names.
+    static std::chrono::steady_clock::time_point last_log{};
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_log < std::chrono::seconds{2} || shader_use.empty()) {
+        return;
+    }
+    last_log = now;
+    std::vector<std::pair<u64, std::pair<u32, u32>>> sorted(shader_use.begin(),
+                                                            shader_use.end());
+    std::sort(sorted.begin(), sorted.end(),
+              [](const auto& a, const auto& b) { return a.second.first > b.second.first; });
+    std::string top;
+    for (std::size_t i = 0; i < sorted.size() && i < 12; i++) {
+        top += fmt::format("{:016X}:{}draws/{}coarse ", sorted[i].first, sorted[i].second.first,
+                           sorted[i].second.second);
+    }
+    LOG_INFO(Render_Vulkan, "ThorShaderUse shaders={} {}", sorted.size(), top);
+    shader_use.clear();
+#endif
 }
 
 void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {

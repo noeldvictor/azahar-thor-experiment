@@ -10,6 +10,7 @@
 #include "common/settings.h"
 #include "core/frontend/emu_window.h"
 #include "video_core/custom_textures/custom_format.h"
+#include "video_core/frame_profile.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 
@@ -151,6 +152,42 @@ Instance::Instance(Frontend::EmuWindow& window, u32 physical_device_index)
 
     physical_device = physical_devices[physical_device_index];
     available_extensions = GetSupportedExtensions(physical_device);
+#if THOR_FRAME_PROFILING
+    // The full list, once, so a question about whether the driver offers something can be
+    // answered from a log instead of from a guess about what the driver build contains. A string
+    // present in the driver binary is not the same as an extension advertised for this GPU.
+    {
+        std::string all;
+        for (const std::string& name : available_extensions) {
+            all += name;
+            all += ' ';
+        }
+        LOG_INFO(Render_Vulkan, "ThorDeviceExtensions count={} {}", available_extensions.size(),
+                 all);
+        const bool has_fsr =
+            std::find(available_extensions.begin(), available_extensions.end(),
+                      std::string{VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME}) !=
+            available_extensions.end();
+        LOG_INFO(Render_Vulkan, "ThorShadingRate advertised={}", has_fsr);
+        if (has_fsr) {
+            // Which rates the part will actually honour, and with how many samples. A driver may
+            // advertise the extension and still offer only the trivial 1x1 rate.
+            u32 count = 0;
+            (void)physical_device.getFragmentShadingRatesKHR(&count, nullptr);
+            std::vector<vk::PhysicalDeviceFragmentShadingRateKHR> rates(count);
+            if (count) {
+                (void)physical_device.getFragmentShadingRatesKHR(&count, rates.data());
+            }
+            std::string listed;
+            for (const auto& rate : rates) {
+                listed += fmt::format("{}x{}:samples{} ", rate.fragmentSize.width,
+                                      rate.fragmentSize.height,
+                                      static_cast<u32>(rate.sampleCounts));
+            }
+            LOG_INFO(Render_Vulkan, "ThorShadingRate rates={} {}", count, listed);
+        }
+    }
+#endif
     properties = physical_device.getProperties();
     if (properties.apiVersion < TargetVulkanApiVersion) {
         throw std::runtime_error(fmt::format(
@@ -404,7 +441,8 @@ bool Instance::CreateDevice() {
         vk::PhysicalDeviceRobustness2FeaturesEXT,
         vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT,
         vk::PhysicalDevicePipelineCreationCacheControlFeaturesEXT,
-        vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR>();
+        vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR,
+        vk::PhysicalDeviceFragmentShadingRateFeaturesKHR>();
     const vk::StructureChain properties_chain =
         physical_device
             .getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDriverProperties,
@@ -422,7 +460,7 @@ bool Instance::CreateDevice() {
         return false;
     }
 
-    boost::container::static_vector<const char*, 13> enabled_extensions;
+    boost::container::static_vector<const char*, 16> enabled_extensions;
     const auto add_extension = [&](std::string_view extension, bool blacklist = false,
                                    std::string_view reason = "") -> bool {
         const auto result =
@@ -450,6 +488,10 @@ bool Instance::CreateDevice() {
     const bool is_turnip = driver_id == vk::DriverIdKHR::eMesaTurnip;
 
     add_extension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    // Coarse shading for draws whose output is low frequency. The a740 advertises 2x2 and 4x4;
+    // the rate is set per draw as dynamic state, so enabling it costs nothing until it is used.
+    const bool has_fragment_shading_rate =
+        add_extension(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     image_format_list = add_extension(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
     shader_stencil_export = add_extension(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);
     external_memory_host = add_extension(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
@@ -540,6 +582,7 @@ bool Instance::CreateDevice() {
         vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT{},
         vk::PhysicalDevicePipelineCreationCacheControlFeaturesEXT{},
         vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR{},
+        vk::PhysicalDeviceFragmentShadingRateFeaturesKHR{},
     };
 
 #define PROP_GET(structName, prop, property) property = properties_chain.get<structName>().prop;
@@ -616,6 +659,14 @@ bool Instance::CreateDevice() {
     if (external_memory_host) {
         PROP_GET(vk::PhysicalDeviceExternalMemoryHostPropertiesEXT, minImportedHostPointerAlignment,
                  min_imported_host_pointer_alignment);
+    }
+
+    if (has_fragment_shading_rate) {
+        FEAT_SET(vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, pipelineFragmentShadingRate,
+                 fragment_shading_rate)
+    } else {
+        fragment_shading_rate = false;
+        device_chain.unlink<vk::PhysicalDeviceFragmentShadingRateFeaturesKHR>();
     }
 
     if (has_fragment_shader_barycentric) {

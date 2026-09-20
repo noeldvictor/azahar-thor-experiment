@@ -182,6 +182,16 @@ void RenderManager::NoteDrawShape(bool samples_rt, bool depth_used, bool small_v
     shape_vertices += vertices;
 }
 
+void RenderManager::NoteCoarseCandidate(u32 vertices) {
+    const std::size_t bucket = vertices <= 16    ? 0
+                               : vertices <= 64  ? 1
+                               : vertices <= 256 ? 2
+                               : vertices <= 1024
+                                   ? 3
+                                   : 4;
+    coarse_verts[bucket]++;
+}
+
 void RenderManager::MarkWritten(vk::Image image) {
     if (!image) {
         return;
@@ -217,6 +227,7 @@ void RenderManager::ReportPassTrace() {
         shape_draws = shape_samples_rt = shape_depth = shape_quad = shape_cover =
             shape_blended = 0;
         shape_vertices = 0;
+        coarse_verts = {};
         written_this_frame.clear();
         if (timestamp_pool && fragment_pool && timestamp_index != 0) {
             scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
@@ -377,6 +388,10 @@ void RenderManager::ReportPassTrace() {
                 }
             }
             LOG_INFO(Render_Vulkan,
+                     "ThorCoarseVerts le16={} le64={} le256={} le1024={} gt1024={}",
+                     coarse_verts[0], coarse_verts[1], coarse_verts[2], coarse_verts[3],
+                     coarse_verts[4]);
+            LOG_INFO(Render_Vulkan,
                      "ThorDrawShape draws={} samples_rt={} depth={} quad={} cover={} blended={} "
                      "avg_verts={:.1f}",
                      shape_draws, shape_samples_rt, shape_depth, shape_quad, shape_cover,
@@ -405,6 +420,7 @@ void RenderManager::ReportPassTrace() {
     shape_draws = shape_samples_rt = shape_depth = shape_quad = shape_cover =
         shape_blended = 0;
     shape_vertices = 0;
+    coarse_verts = {};
 #endif
 }
 

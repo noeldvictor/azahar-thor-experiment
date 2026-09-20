@@ -87,6 +87,15 @@ of a raw `adb` command when a tool exists.
   to find where frame time goes before you write a NEON or ARM64 change. The event is the
   software clock, because this kernel refuses hardware counters. Symbols come from the
   unstripped library in the build tree, so profile a build you still have output for.
+- `bench` is the measurement loop in one call: launch a title, load a save state, take perf
+  samples, capture the scene and record the GPU clock range. It reports `throttled` when any
+  sample fell below 615 MHz, which voids a run. Prefer it over a throwaway script, so every
+  result has the same shape and can be compared with an earlier one. It finds the ROM for a
+  title id by reading the `.zcci` headers, so a title id is enough.
+- `shader_use` lists the fragment shader fingerprints the frame spends its draws on, with how
+  many of each shader's draws got a coarse shading rate. Needs a profiling build.
+- `shader_rules` sets the per-title draw rules that target those fingerprints. See the section
+  on targeting individual draws below; rules apply at the next launch with no rebuild.
 - `perf_stats` returns the emulator's own numbers, averaged over samples: game FPS, speed
   percent, and the frame time split in milliseconds (`gpu_cmd` is guest command processing,
   `swap` includes waiting for the host GPU). Use it instead of reading the overlay from a
@@ -171,6 +180,17 @@ GPU busy percent at a fixed frame rate as the primary efficiency number, and tre
 that cannot hold full speed at 2x as a bug to find in the render path: pass restarts, tile
 loads and stores, needless copies, needless downloads. Do not accept it as the game's cost.
 
+Calibrated on 2026-09-20, because that rule was written from one scene and is too strong as
+stated. At 3x with GSR and no frame limit, Ocarina of Time 3D reads 1213% and Kirby Triple
+Deluxe 1208%, and Ocarina of Time 3D still holds 190% at 8x. So the emulator has about twelve
+times the headroom it needs at 3x on a title that draws its scene once or twice, and clears the
+panel's native 4.5x comfortably. **Before concluding anything about the emulator from a slow
+scene, measure a second title.** A scene can be expensive because the game is expensive: the
+E.X. Troopers snow field shades 1800 draws a frame, every one of them blended, at about 58x
+overdraw, and that is the blizzard rather than anything the emulator added. Keep the principle
+that a shortfall is a named, measured cost rather than a hardware limit; drop the assumption
+that the cost is always ours.
+
 Fast forward is part of that expectation. At 2x resolution every scene must reach 200% speed
 with the per-title frame limit at 200. A scene that cannot is a bug with the same causes, and
 the GPU busy percent at 100% speed predicts it: 68% busy at 100% speed means the GPU cannot
@@ -178,6 +198,41 @@ give 200%. Measure fast forward with the speed overlay on (`Layout.performance_o
 and read the guest FPS, the speed, the GPU busy percent, and the emulation thread share. The
 panels are pinned at 60 Hz, so the screen shows at most 60 frames per second; fast forward is
 game speed, not frame rate.
+
+## Targeting individual draws, instead of guessing in the core
+
+When a scene is slow because of what the game draws, do not write a heuristic in the render path
+to guess which draws are expendable. It will be wrong: on 2026-09-20 a rule of "blended and does
+not write depth" caught this game's ink outlines along with its fog, because an outline and a
+sheet of fog have identical render state. **Render state cannot tell a soft effect from a sharp
+one. A fingerprint can.** This is how Dolphin does it too, with graphics mods that name a texture
+hash rather than a state combination.
+
+The layer is `shader_shading_rules` in a per-title ini: comma separated `<fingerprint>:<rate>`
+pairs, where the fingerprint is `PicaFSConfig::Hash()`, the hash of the PICA combiner, lighting,
+fog and alpha test setup, and the rate is 2 or 4 for 2x2 or 4x4 coarse shading through
+`VK_KHR_fragment_shading_rate`. A draw whose fingerprint is not listed is untouched, so the
+default path stays bit-identical. Rules are read at launch, so an experiment needs no rebuild.
+
+The loop, all through the `thor` MCP server:
+
+1. `shader_use` lists the fingerprints the frame spends its draws on. Needs a profiling build.
+2. `shader_rules` sets a rule for the title.
+3. `bench` launches, loads the save state, samples and screenshots in one call.
+
+Draw count is not cost. A shader with thousands of cheap draws can matter less than one with a
+few draws that cover the screen, so rank candidates by measuring with `bench`, never by the
+count `shader_use` reports.
+
+## When instrumentation disagrees with a measurement, suspect the instrumentation
+
+Twice on 2026-09-20 a counter told a clean story that was wrong. `ThorShaderUse` recorded the
+last shading rate seen for a fingerprint instead of counting coarsened draws, so a shader used by
+both a coarse and a sharp draw reported whichever came last, and the log appeared to say that two
+shaders carried a twelve point speed gain. Applying rules to exactly those two moved nothing,
+which is what exposed it. A `simpleperf` report filtered on `EmuThread` returned zero samples
+because the thread is called `NativeEmulation`. Check that a surprising counter agrees with an
+independent measurement before building on it.
 
 ## Open work
 
