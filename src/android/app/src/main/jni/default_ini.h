@@ -468,6 +468,24 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # The trade is that an effect computed in 2x2 or 4x4 blocks is softer up close. Raising the
 # resolution and turning this on is usually a better picture than lowering the resolution.
 # 1 (default): Off, 2: 2x2 blocks, 4: 4x4 blocks
+)") DECLARE_KEY(tiled_rendering) BOOST_HANA_STRING(R"(
+
+# Whether the Adreno driver renders a pass into on-chip tile memory or straight to main memory.
+# Tiled rendering makes blending free, because the read and write stay on the chip, but it runs
+# the geometry twice: once to sort primitives into tiles, then again to shade them.
+#
+# A 3DS frame is about ninety passes over small targets and can be well over a thousand draws, so
+# the second geometry pass usually costs more than the blending saves. Measured in the E.X.
+# Troopers snow field at 3x: forcing the direct path 60.35%, letting the driver choose per pass
+# 55.04%, forcing tiled 55.6%. At 2x, forcing the direct path took the same scene from 75.6% to
+# 96.1%. So the direct path is the default, and letting the driver choose is not free.
+#
+# A game that draws its scene once or twice with heavy blending may prefer tiled; this is here so
+# that can be tried rather than assumed.
+#
+# WARNING: this is global rather than per title, and it only takes effect after the app is
+# restarted, because the driver reads it once before any game is loaded.
+# 0: Let the driver choose per pass, 1 (default): Force the direct path, 2: Force tiled
 )") DECLARE_KEY(blended_shading_rate) BOOST_HANA_STRING(R"(
 
 # Per-draw rules, the precise version of the setting above. Instead of guessing from render

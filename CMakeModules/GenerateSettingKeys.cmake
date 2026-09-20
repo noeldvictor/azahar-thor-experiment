@@ -155,6 +155,7 @@ foreach(KEY IN ITEMS
     "pass_restart_every"
     "rgba8_storage_usage"
     "accurate_tev_rounding"
+    "tiled_rendering"
     "blended_shading_rate"
     "shader_shading_rules"
     "language" # FIXME: DUPLICATE KEY (libretro equivalent: language_value)

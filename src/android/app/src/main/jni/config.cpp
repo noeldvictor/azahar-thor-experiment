@@ -380,6 +380,7 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.pass_restart_every);
     ReadSetting("Utility", Settings::values.rgba8_storage_usage);
     ReadSetting("Utility", Settings::values.accurate_tev_rounding);
+    ReadSetting("Utility", Settings::values.tiled_rendering);
     ReadSetting("Utility", Settings::values.blended_shading_rate);
     ReadSetting("Utility", Settings::values.shader_shading_rules);
 

@@ -820,6 +820,26 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         pipeline_cache.UseFragmentShader(regs, user_config);
     }
 
+    // A rule may drop this material, or thin it so only one draw in N is submitted. Thinning
+    // suits a layered effect: a blizzard drawn from six sheets still reads as a blizzard from
+    // three, where removing the material outright reads as missing weather. Done here, as soon
+    // as the shader identifies the material and before any pass, uniform or descriptor work, so
+    // a dropped draw costs nothing.
+    if (!shading_rules.empty()) {
+        const DrawRule rule = RuleForShader(pipeline_cache.CurrentFragmentShaderHash());
+        if (rule.keep_one_of == 255) {
+            return true;
+        }
+        if (rule.keep_one_of >= 2) {
+            u32& seen = thin_counters[pipeline_cache.CurrentFragmentShaderHash()];
+            const bool keep = (seen % rule.keep_one_of) == 0;
+            seen++;
+            if (!keep) {
+                return true;
+            }
+        }
+    }
+
     // Sync the LUTs within the texture buffer
 {
         VideoCore::ScopedFrameProfileTimer timer{
@@ -876,8 +896,8 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     u8 rate = 1;
     if (instance.IsFragmentShadingRateSupported()) {
         const u64 fs_hash = pipeline_cache.CurrentFragmentShaderHash();
-        if (const u8 ruled = ShadingRateForShader(fs_hash); ruled > 1) {
-            rate = ruled;
+        if (const DrawRule ruled = RuleForShader(fs_hash); ruled.rate > 1) {
+            rate = ruled.rate;
         } else if (shading_rules.empty()) {
             const u32 requested_rate = Settings::values.blended_shading_rate.GetValue();
             if (requested_rate > 1 && regs.framebuffer.output_merger.alphablend_enable != 0 &&
@@ -994,13 +1014,32 @@ void RasterizerVulkan::ReloadShadingRules() {
         }
         try {
             const u64 hash = std::stoull(item.substr(0, colon), nullptr, 16);
-            const u32 rate = static_cast<u32>(std::stoul(item.substr(colon + 1)));
-            if (rate == 2 || rate == 4) {
-                shading_rules.emplace(hash, static_cast<u8>(rate));
-            } else {
-                LOG_WARNING(Render_Vulkan, "Shading rule for {:016X} has rate {}, expected 2 or 4",
-                            hash, rate);
+            std::string action = item.substr(colon + 1);
+            while (!action.empty() && action.front() == ' ') {
+                action.erase(action.begin());
             }
+            DrawRule rule;
+            if (action == "skip") {
+                rule.keep_one_of = 255;
+            } else if (action.rfind("thin", 0) == 0) {
+                const u32 n = static_cast<u32>(std::stoul(action.substr(4)));
+                if (n < 2 || n > 254) {
+                    LOG_WARNING(Render_Vulkan, "Rule for {:016X} says thin{}, expected 2 to 254",
+                                hash, n);
+                    continue;
+                }
+                rule.keep_one_of = static_cast<u8>(n);
+            } else {
+                const u32 rate = static_cast<u32>(std::stoul(action));
+                if (rate != 2 && rate != 4) {
+                    LOG_WARNING(Render_Vulkan,
+                                "Rule for {:016X} has rate {}, expected 2, 4, thinN or skip", hash,
+                                rate);
+                    continue;
+                }
+                rule.rate = static_cast<u8>(rate);
+            }
+            shading_rules.emplace(hash, rule);
         } catch (const std::exception&) {
             LOG_WARNING(Render_Vulkan, "Could not read shading rule '{}'", item);
         }
@@ -1008,9 +1047,9 @@ void RasterizerVulkan::ReloadShadingRules() {
     LOG_INFO(Render_Vulkan, "Loaded {} shading rules", shading_rules.size());
 }
 
-u8 RasterizerVulkan::ShadingRateForShader(u64 fs_hash) const {
+RasterizerVulkan::DrawRule RasterizerVulkan::RuleForShader(u64 fs_hash) const {
     const auto it = shading_rules.find(fs_hash);
-    return it == shading_rules.end() ? u8{1} : it->second;
+    return it == shading_rules.end() ? DrawRule{} : it->second;
 }
 
 void RasterizerVulkan::NoteShaderUse(u64 fs_hash, u8 rate) {

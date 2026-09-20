@@ -160,14 +160,21 @@ private:
     /// Per-title draw rules: fragment shader fingerprint to coarse shading rate. Parsed from
     /// Settings::values::shader_shading_rules, which a per-title ini supplies.
     void ReloadShadingRules();
-    u8 ShadingRateForShader(u64 fs_hash) const;
+    /// What a rule asks for on a material: a coarse shading rate, and optionally that only one
+    /// draw in every `keep_one_of` is submitted. 255 drops the material entirely.
+    struct DrawRule {
+        u8 rate = 1;
+        u8 keep_one_of = 0;
+    };
+    DrawRule RuleForShader(u64 fs_hash) const;
     void NoteShaderUse(u64 fs_hash, u8 rate);
     /// Is this draw identical to the one before it? A scene that replays the same batch is a
     /// port or emulation fault; a scene that simply has many distinct batches is the game.
     void NoteDrawIdentity(u64 fs_hash, u32 vertices, u32 base_address, u32 vertex_offset);
     void ReportShaderUse();
     std::string shading_rules_text{"ÿ"};
-    std::unordered_map<u64, u8> shading_rules;
+    std::unordered_map<u64, DrawRule> shading_rules;
+    std::unordered_map<u64, u32> thin_counters;
     // hash -> {draws, draws that got a coarse rate}. Recording the last rate seen
     // instead of counting hid that one shader serves both coarse and sharp draws.
     std::unordered_map<u64, std::pair<u32, u32>> shader_use;

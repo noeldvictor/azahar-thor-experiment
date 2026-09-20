@@ -2597,3 +2597,29 @@
   7 ms. That cost is real and is worth attacking, but it is not this scene's wall: `swap` is
   13 ms against `gpu_cmd` 7 ms at 3x, so the GPU is the constraint and halving the draw count
   would not change the fragment count or the blending behind it.
+- Removing pixels works where shading them coarsely did not (2026-09-20). The rule layer gained
+  two actions beside a coarse rate: `skip`, which drops a material, and `thinN`, which submits one
+  draw in every N of it. Measured at 3x in the snow field on a profiling build, so only
+  differences matter: baseline 59.95%, `thin2` on all 28 effect materials **84.93%**, `skip` on
+  all 28 **99.72%**. Coarse shading topped out at 74.94% on the same scene.
+  That is the confirmation of the blend-traffic diagnosis. Coarse shading leaves every fragment
+  doing a colour read and write; thinning and skipping remove the fragments, so the frame falls
+  from 27.64 ms to 19.64 and then 11.95. Pixels are the currency.
+  Neither blanket setting is shippable as it stands. `skip` on all 28 is full speed with the
+  weather gone. `thin2` keeps the blizzard reading as a blizzard but visibly dims the scene: at
+  least one of the 28 is an additive light or glow layer, and halving its draws halves its
+  contribution. The fix is per-fingerprint rather than blanket, which is what the layer is for,
+  and the work left is bisecting the 28 into particle layers, which thin well, and light layers,
+  which must not be touched.
+- Tiled rendering is closed, measured three ways (2026-09-20). `TU_DEBUG(SYSMEM)` appeared as the
+  tiling disable reason in a Turnip trace, which looked at first like the emulator forbidding
+  tiling without ever testing it. It is deliberate and documented in `GpuDriverHelper.kt`, and it
+  is still right: at 3x, forcing the direct path reads 60.35%, letting Turnip's autotune choose
+  per pass reads 55.04%, and forcing tiled reads 55.6%. Autotune, the chooser a heuristic patch
+  would have improved, is worse than the blunt default, so there is nothing to win by patching it.
+  Tiling loses because the binning pass runs the geometry a second time and this scene submits
+  1846 draws a frame; the second pass costs more than on-chip blending saves.
+  The useful outcome is a capability rather than a fix: `MESA_GPU_TRACES=print` with
+  `MESA_GPU_TRACEFILE`, set through the existing `thor_driver_env.txt`, prints per pass whether it
+  was tiled, why not, its draw count, its average per-sample bandwidth and its LRZ status, with no
+  driver patch. It writes about 176 MB a minute, so it is for diagnosis and never for timing.

@@ -687,6 +687,9 @@ struct Values {
     Setting<bool> accurate_tev_rounding{true, Keys::accurate_tev_rounding};
     // Coarse shading rate for blended draws, as a power of two per axis: 1 is off, 2 is a 2x2
     // block, 4 is a 4x4 block. Helps a title whose frame is mostly large blended effects.
+    // 0 lets the driver choose per pass, 1 forces the direct path, 2 forces tiled. Read by the
+    // Android driver loader before any title is known, so it is global and needs an app restart.
+    Setting<u32> tiled_rendering{1, Keys::tiled_rendering};
     Setting<u32> blended_shading_rate{1, Keys::blended_shading_rate};
     // Per-title draw rules, the targeting layer. Comma separated "<fs hash>:<rate>" pairs, for
     // example "a1b2c3d4e5f60718:2". Empty means no rules and the core guesses nothing.
