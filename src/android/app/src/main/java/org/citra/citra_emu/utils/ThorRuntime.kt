@@ -102,12 +102,24 @@ object ThorRuntime {
                     // decides whether to accept it through allow_savestate_mismatch.
                     val listed = NativeLibrary.getSavestateInfo()?.any { it.slot == slot } ?: false
                     result.put("listed", listed)
+                    NativeLibrary.lastCoreError = null
                     NativeLibrary.loadState(slot)
-                    // listed is the honest signal. A state written by another build is not
-                    // listed, and the load is dropped even when the core is told to accept a
-                    // version mismatch, so reporting success unconditionally hid real failures.
                     result.put("requested", true)
-                    result.put("loaded", listed)
+                    // The core reports a refused load through onCoreError, which also raises the
+                    // dialog. Wait for that to arrive, then report what really happened. A tool
+                    // that trusts the request alone reads a stale scene as a loaded one.
+                    var error: String? = null
+                    for (attempt in 0 until 20) {
+                        error = NativeLibrary.lastCoreError
+                        if (error != null) {
+                            break
+                        }
+                        Thread.sleep(100)
+                    }
+                    result.put("loaded", listed && error == null)
+                    if (error != null) {
+                        result.put("core_error", error)
+                    }
                 }
                 "states" -> {
                     val info = NativeLibrary.getSavestateInfo()

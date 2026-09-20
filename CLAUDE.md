@@ -79,6 +79,10 @@ of a raw `adb` command when a tool exists.
   build, so a change can be measured against the same scene before and after a rebuild. Set it
   with `config_set`. It is off by default; a state whose format really changed will crash, so it
   is for testing only.
+- `cpu_profile` records a CPU profile of the running app and returns the hottest symbols. Use it
+  to find where frame time goes before you write a NEON or ARM64 change. The event is the
+  software clock, because this kernel refuses hardware counters. Symbols come from the
+  unstripped library in the build tree, so profile a build you still have output for.
 - `perf_stats` returns the emulator's own numbers, averaged over samples: game FPS, speed
   percent, and the frame time split in milliseconds (`gpu_cmd` is guest command processing,
   `swap` includes waiting for the host GPU). Use it instead of reading the overlay from a
@@ -104,10 +108,14 @@ Rules for driving the device, learned the hard way on 2026-09-19:
 - **Never wait for the boot videos to play out.** They run for minutes and a save state load is
   ignored while they do. Ask the user to bring the game to the scene, or to load the state from
   the in-game menu, then measure.
-- **A save state only restores in the build that wrote it.** Installing a new APK invalidates
-  every state, and the load is dropped without an error. To compare a code change, put it behind
-  a setting and measure both sides on one build, as `fast_fragment_lighting` does. Reinstalling
-  between the two halves of a comparison wastes the run.
+- **A save state restores across builds only with `allow_savestate_mismatch` set.** Without it
+  the core refuses the state and raises a dialog whose "Continue" button closes the message
+  without retrying, so the game stays where it was. `emu_command load_state` reports
+  `"loaded": false` and names the dialog when that happens. Never treat a request as a result.
+- **A new setting must also be read in `src/android/app/src/main/jni/config.cpp`.** Declaring it
+  in `settings.h`, `GenerateSettingKeys.cmake` and `default_ini.h` only makes the key legal. A
+  key that is never read keeps its built-in default, the ini value is ignored in silence, and an
+  A/B test built on it compares a build against itself.
 - **Confirm the scene with a screenshot before recording a number.** A video or a cutscene reads
   as full speed with the GPU near idle and looks like a result.
 

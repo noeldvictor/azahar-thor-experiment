@@ -141,8 +141,16 @@ System::ResultStatus System::RunLoop(bool tight_loop) {
             return ResultStatus::ErrorSavestate;
         }
         if (info.status == Core::SaveStateInfo::ValidationStatus::BuildMismatch) {
-            status_details = info.build_name;
-            return ResultStatus::ErrorSavestateBuildMismatch;
+            // The loader in savestate.cpp has the same check and obeys this setting. Without the
+            // test here the setting never applies, because this gate rejects the state first.
+            if (!Settings::values.allow_savestate_mismatch.GetValue()) {
+                status_details = info.build_name;
+                return ResultStatus::ErrorSavestateBuildMismatch;
+            }
+            LOG_WARNING(Core,
+                        "Loading a save state from build {} because allow_savestate_mismatch is "
+                        "set. Expect a crash if the state format changed.",
+                        info.build_name);
         }
         save_state_slot = param;
         save_state_request_time = std::chrono::steady_clock::now();

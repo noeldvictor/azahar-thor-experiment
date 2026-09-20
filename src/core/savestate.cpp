@@ -223,8 +223,13 @@ void System::LoadState(u32 slot) {
         // validate header
         SaveStateInfo info;
         info.slot = slot;
-        if (!ValidateSaveState(header, info, title_id, movie_id) ||
-            info.status == SaveStateInfo::ValidationStatus::BuildMismatch) {
+        if (!ValidateSaveState(header, info, title_id, movie_id)) {
+            throw std::runtime_error("Invalid savestate");
+        }
+        // This is the third gate on a build mismatch, after core.cpp and the revision test
+        // below. All three must obey the setting, or it does nothing.
+        if (info.status == SaveStateInfo::ValidationStatus::BuildMismatch &&
+            !Settings::values.allow_savestate_mismatch.GetValue()) {
             throw std::runtime_error("Invalid savestate");
         }
 

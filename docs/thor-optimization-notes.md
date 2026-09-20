@@ -9484,3 +9484,27 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   quantisation: 15 shaders, median 272, mean 239, max 359, still `0 half`, `max_waves` 10 to 16.
   With `disable_spirv_optimizer = true` as well: 14 shaders, median 270, mean 221, max 359,
   still `0 half`. The decoration never reaches the hardware as 16 bit arithmetic on this driver.
+- Save state loading across builds, fixed (2026-09-19). Every save state stopped loading after
+  each reinstall, which made a before and after measurement of any code change impossible. The
+  cause was four independent refusals, not one. The Android config reader in
+  `src/android/app/src/main/jni/config.cpp` never read `allow_savestate_mismatch`, so the value
+  stayed at its built-in false whatever the ini said. `System::RunLoop` in `src/core/core.cpp`
+  returned `ErrorSavestateBuildMismatch` when it handled the load signal. `System::Load`
+  in `src/core/savestate.cpp` threw "Invalid savestate" on the same condition. Only the revision
+  comparison at the bottom of that file read the setting, and the three gates above it made it
+  unreachable. The failures appeared one at a time, each hidden by the one before it.
+- The savestate mismatch dialog is not a retry (2026-09-19). Its "Continue" button closes the
+  message and returns to whatever was already on screen. An automated load that tapped Continue
+  and then read the frame counters recorded the intro video as a loaded scene. `ThorRuntime` now
+  clears the recorded core error, calls the load, waits up to two seconds for an error to
+  arrive, and answers with what happened. The MCP `emu_command load_state` clears the dialog,
+  reports `"loaded": false` and names it.
+- Android CPU profiling, enabled (2026-09-19). `<profileable android:shell="true" />` in the
+  manifest lets `simpleperf` attach to `relWithDebInfoLite`, which sets `isDebuggable = false`.
+  Before that every event was refused with "Permission denied". Two things do not help and were
+  tried first: `setprop security.perf_harden 0`, which the kernel accepts and which changes
+  nothing, and `-p <pid>`, which stays refused because the shell user cannot profile another
+  user's process. Use `simpleperf record --app <package>`. Hardware events such as `cpu-cycles`
+  are refused on this kernel; the software `cpu-clock` event samples at the same rate. The
+  packaged library is stripped, so symbols must come from
+  `src/android/app/build/intermediates/merged_native_libs/`.

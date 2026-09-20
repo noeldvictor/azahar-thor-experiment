@@ -608,26 +608,35 @@ def app_maintenance(op: str = "list", zip_name: str = "", wait_seconds: int = 25
     return text
 
 
-def _dismiss_savestate_dialog() -> bool:
-    """A save state records the emulator build that wrote it. After a rebuild the app asks
-    whether to load it anyway. Answer once so an experiment is not left sitting on a dialog."""
-    _sh("sleep 1.5", timeout=10)
-    for _ in range(3):
+def _clear_core_error_dialog() -> str:
+    """Clear the core error dialog and return its title, or "" when none is up.
+
+    The dialog is the emulator refusing something, most often a save state written by another
+    build. Its "Continue" button only closes the message; it does not retry the load. Clearing
+    it keeps the app usable, and returning the title lets the caller report the real outcome
+    instead of reading a stale scene as a loaded one."""
+    _sh("sleep 1.2", timeout=10)
+    for _ in range(4):
         try:
-            nodes = ui_dump(display=0, max_nodes=60)
+            nodes = ui_dump(display=0, max_nodes=80)
         except Exception:
-            return False
-        labels = {str(node.get("text", "")).strip() for node in nodes}
-        if "Continue" in labels and any("avestate" in label for label in labels):
-            try:
-                ui_tap("Continue")
-                return True
-            except Exception:
-                return False
-        if "Continue" not in labels:
-            return False
-        _sh("sleep 0.5", timeout=10)
-    return False
+            return ""
+        labels = [str(node.get("text", "")).strip() for node in nodes]
+        if "Continue" not in labels and "Abort" not in labels:
+            _sh("sleep 0.4", timeout=10)
+            continue
+        title = next(
+            (label for label in labels if label and label not in {"Continue", "Abort"}), "dialog"
+        )
+        for button in ("Continue", "Abort"):
+            if button in labels:
+                try:
+                    ui_tap(button)
+                except Exception:
+                    pass
+                break
+        return title
+    return ""
 
 
 @mcp.tool()
@@ -670,8 +679,18 @@ def emu_command(command: str = "perf", argument: str = "", wait_seconds: int = 4
             # The app echoes the request id, so a result left over from an earlier command is
             # never mistaken for this one.
             if parsed.get("id") == request_id:
-                if command == "load_state" and parsed.get("loaded"):
-                    _dismiss_savestate_dialog()
+                if command == "load_state":
+                    dialog = _clear_core_error_dialog()
+                    if dialog:
+                        parsed["dialog"] = dialog
+                        parsed["loaded"] = False
+                    if not parsed.get("loaded"):
+                        parsed["hint"] = (
+                            "The state was not loaded. A state written by another build needs "
+                            "allow_savestate_mismatch in the Utility section, and the key must "
+                            "also be read in src/android/app/src/main/jni/config.cpp."
+                        )
+                    return json.dumps(parsed)
                 return text
         _sh("sleep 0.5", timeout=10)
     raise RuntimeError(
@@ -791,6 +810,108 @@ def ui_tap(text: str, display: int = 0) -> str:
             _sh(f"input -d {display} tap {x} {y}")
             return f"tapped '{node['text'] or node['desc'] or node['id']}' at {x},{y}"
     raise RuntimeError(f"no UI node matches '{text}'")
+
+
+@mcp.tool()
+def cpu_profile(
+    seconds: int = 10,
+    frequency: int = 1000,
+    event: str = "cpu-clock",
+    thread: str = "",
+    top: int = 40,
+) -> dict:
+    """Record a CPU profile of the running app and return the hottest symbols.
+
+    The app must be running. Use it to find where the emulation thread spends frame time, so a
+    NEON, ARM64 or GPU change is aimed at real cost instead of a guess.
+
+    The build must carry `<profileable android:shell="true" />` in AndroidManifest.xml. Without
+    it every event is refused with "Permission denied", because the shell user cannot profile
+    another user's process. Hardware events such as cpu-cycles stay refused on this kernel, so
+    the default event is the software clock, which samples the same way.
+
+    thread filters by thread name, for example "EmuThread". Symbol names come from the
+    unstripped library in the build tree; the installed one is stripped. Returns the report
+    text and the local path of the recording."""
+    if _pid() is None:
+        raise RuntimeError("The app is not running. Launch a game first.")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    remote = f"/data/local/tmp/thor-{stamp}.perf.data"
+    command = (
+        f"cd /data/local/tmp && simpleperf record --app {PACKAGE} -e {event} -g "
+        f"--duration {seconds} -f {frequency} -o {remote}"
+    )
+    log = _sh(command, timeout=seconds + 180)
+    if "Permission denied" in log:
+        raise RuntimeError(f"simpleperf was refused. Is the build profileable? {log.strip()}")
+    local = _capture_path(f"thor-{stamp}", ".perf.data")
+    local.parent.mkdir(parents=True, exist_ok=True)
+    _adb(["-s", _serial(), "pull", remote, str(local)], timeout=600)
+    _sh(f"rm -f {remote}")
+    return {
+        "record_log": log.strip().splitlines()[-2:],
+        "data": str(local),
+        "report": _perf_report(local, thread=thread, top=top),
+    }
+
+
+def _ndk_root() -> Path | None:
+    """The newest installed NDK that carries the simpleperf host tools."""
+    candidates = []
+    for env in ("ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "NDK_HOME"):
+        value = os.environ.get(env)
+        if value:
+            candidates.append(Path(value))
+    sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+    roots = [Path(sdk)] if sdk else []
+    roots.append(Path.home() / "AppData/Local/Android/Sdk")
+    roots.append(Path.home() / "Android/Sdk")
+    for root in roots:
+        ndk_dir = root / "ndk"
+        if ndk_dir.is_dir():
+            candidates.extend(sorted(ndk_dir.iterdir(), reverse=True))
+    for candidate in candidates:
+        if (candidate / "simpleperf" / "binary_cache_builder.py").is_file():
+            return candidate
+    return None
+
+
+def _unstripped_lib_dir() -> Path | None:
+    """The build tree keeps an unstripped copy of the native library. The installed one has no
+    symbol table, so a report against it shows addresses only."""
+    base = REPO_ROOT / "src/android/app/build/intermediates/merged_native_libs"
+    matches = sorted(base.glob("*/*/out/lib/arm64-v8a/libcitra-android.so"),
+                     key=lambda f: f.stat().st_mtime, reverse=True)
+    return matches[0].parent if matches else None
+
+
+def _perf_report(data: Path, thread: str = "", top: int = 40) -> str:
+    """Turn a recording into a ranked symbol list. Returns a note when the host tools are
+    missing, so a profile is still kept rather than lost."""
+    ndk = _ndk_root()
+    if ndk is None:
+        return "No NDK simpleperf host tools found. The recording is kept; symbolize it later."
+    host = ndk / "simpleperf/bin/windows/x86_64/simpleperf.exe"
+    if not host.is_file():
+        host = ndk / "simpleperf/bin/linux/x86_64/simpleperf"
+    if not host.is_file():
+        return f"No host simpleperf under {ndk}. The recording is kept."
+    cache = data.with_suffix(".binary_cache")
+    lib_dir = _unstripped_lib_dir()
+    if lib_dir is not None:
+        subprocess.run(
+            [sys.executable, str(ndk / "simpleperf/binary_cache_builder.py"),
+             "-i", str(data), "-lib", str(lib_dir), "--builder_output_dir", str(cache)],
+            capture_output=True, text=True, timeout=900,
+        )
+    command = [str(host), "report", "-i", str(data), "--sort", "dso,symbol", "-n"]
+    if cache.is_dir():
+        command += ["--symfs", str(cache)]
+    if thread:
+        command += ["--comms", thread]
+    done = subprocess.run(command, capture_output=True, text=True, timeout=900)
+    lines = [line for line in done.stdout.splitlines() if line.strip()]
+    return chr(10).join(lines[: top + 6]) or done.stderr.strip()
 
 
 def _main() -> None:

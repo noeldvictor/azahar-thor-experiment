@@ -325,6 +325,10 @@ void Config::ReadValues() {
     ReadSetting("Utility", Settings::values.custom_textures);
     ReadSetting("Utility", Settings::values.preload_textures);
     ReadSetting("Utility", Settings::values.async_custom_loading);
+    // Every key must be read here as well as declared in default_ini.h. A key that is only
+    // declared keeps its built-in default on Android, and the ini value is ignored in silence.
+    ReadSetting("Utility", Settings::values.allow_savestate_mismatch);
+    ReadSetting("Utility", Settings::values.fast_fragment_lighting);
 
     // Audio
     ReadSetting("Audio", Settings::values.audio_emulation);

@@ -46,6 +46,11 @@
         <meta-data android:name="android.game_mode_config"
             android:resource="@xml/game_mode_config" />
 
+        <!-- Lets `simpleperf` and Android Studio profilers attach to a non-debuggable build.
+             Profiling is how a frame-time cost is found; it does not permit debugging or
+             reading app data. minSdk is 29, so this tag is always understood. -->
+        <profileable android:shell="true" />
+
         <activity
             android:name="org.citra.citra_emu.ui.main.MainActivity"
             android:theme="@style/Theme.Citra.Splash.Main"

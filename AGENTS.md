@@ -1881,3 +1881,51 @@
   the delta, and converted the index to an integer and back purely to negate it. The scale is
   computed once and the already integral clamped value is negated directly. A light pays this
   once per lookup table it samples.
+- An Android setting needs four declarations, not three (2026-09-19). `src/common/settings.h`,
+  `CMakeModules/GenerateSettingKeys.cmake` and `src/android/app/src/main/jni/default_ini.h` only
+  make a key legal. The value still reaches nothing until `ReadSetting` is called for it in
+  `src/android/app/src/main/jni/config.cpp`. A key that is declared but not read keeps its
+  built-in default, and the ini value is ignored without any warning. `allow_savestate_mismatch`
+  and `fast_fragment_lighting` were both in that state.
+- `allow_savestate_mismatch` never worked before this fix (2026-09-19). Four things blocked it,
+  and each one had to be removed before a state loaded. The Android config reader never read the
+  key, so the value was always false. `src/core/core.cpp` rejected a foreign state at the
+  `Signal::Load` gate and returned `ErrorSavestateBuildMismatch` before the setting was read.
+  `System::Load` in `src/core/savestate.cpp` threw "Invalid savestate" on the same condition.
+  Only the fourth test, the revision comparison further down that file, ever consulted the
+  setting, and the three gates above it made that test unreachable. All four now agree. This is
+  why every save state stopped loading after each reinstall. When a setting appears to do
+  nothing, count the places that can refuse before it is read.
+- The savestate mismatch dialog does not retry (2026-09-19). Its "Continue" button only closes
+  the message. Tapping it leaves the game wherever it already was, which reads as a loaded scene
+  to anything that does not look at the screen. `emu_command load_state` now reports
+  `"loaded": false` with the dialog title instead, and `ThorRuntime` waits for the core error
+  before answering rather than reporting the request as the result.
+- The `fast_fragment_lighting` comparison of 2026-09-19 is void. The key was declared but never
+  read on Android, so both halves of the test ran the same code. 3x measured 52.2% against 52.3%
+  and 2x fast forward 102.7% against 102.8% because nothing changed between the runs. Repeat the
+  comparison on a build that reads the key before drawing any conclusion about fragment ALU cost.
+- The Android build is profileable (2026-09-19). `<profileable android:shell="true" />` in
+  `src/android/app/src/main/AndroidManifest.xml` lets `simpleperf` attach to the release build.
+  Without it every event is refused with "Permission denied", because the shell user cannot
+  profile another user's process, and `relWithDebInfoLite` sets `isDebuggable = false`. Record
+  with `simpleperf record --app <package>`; a bare `-p <pid>` is still refused. Hardware events
+  such as `cpu-cycles` stay refused on this kernel, so use the software `cpu-clock` event.
+  `setprop security.perf_harden 0` is not needed and does not help. The `cpu_profile` tool in
+  `tools/thor-mcp/server.py` does the recording, the pull and the symbol lookup.
+- Symbolize a profile against the build tree, not the device (2026-09-19). Gradle strips the
+  packaged library, so a report against the installed copy shows addresses only. The unstripped
+  copy is under `src/android/app/build/intermediates/merged_native_libs/`, and the NDK's
+  `simpleperf/binary_cache_builder.py` maps it onto the recording by build id.
+- Lighting normalise hoist, measured properly and rejected (2026-09-19). The first comparison was
+  void because the key was never read. With a build that reads it, the snow field at 3x from save
+  state 5 gives 52.09% speed with `fast_fragment_lighting = false` and 52.36% with it true, over
+  six samples each, GPU pinned at 680 MHz and 99.8% busy in both. The spread inside each set is
+  wider than the gap, so the change is worth nothing end to end. The picture is identical. Keep
+  the code, because it is strictly less work and costs nothing, but do not look for more speed in
+  fragment lighting ALU. The snow field is not limited by it.
+- The GPU is the limiter in the snow field at every resolution measured (2026-09-19). At 2x the
+  frame is 14.45 ms with the GPU 99.8% busy at 680 MHz, against roughly 12.4 ms of CPU work in
+  the same frame. At 3x the frame is 32.0 ms with the GPU still 99.8% busy. A CPU-side change
+  cannot raise the 2x result while the GPU stays saturated, and 200% at 2x needs the GPU work per
+  frame roughly halved.

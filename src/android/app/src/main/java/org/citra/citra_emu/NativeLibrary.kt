@@ -268,6 +268,11 @@ object NativeLibrary {
     external fun deleteOpenGLShaderCache(titleId: Long)
     external fun deleteVulkanShaderCache(titleId: Long)
 
+    /** The most recent core error, or null when none happened since it was last cleared. */
+    @Volatile
+    @JvmStatic
+    var lastCoreError: String? = null
+
     private var coreErrorAlertResult = false
     private val coreErrorAlertLock = Object()
 
@@ -288,6 +293,9 @@ object NativeLibrary {
     @Keep
     @JvmStatic
     fun onCoreError(error: CoreError?, details: String): Boolean {
+        // Record the error so an automated caller can tell a load that failed from one that
+        // worked. The dialog alone is not a signal a tool can read.
+        lastCoreError = "${error?.name ?: "null"}: $details"
         val emulationActivity = sEmulationActivity.get()
         if (emulationActivity == null) {
             Log.error("[NativeLibrary] EmulationActivity not present")
