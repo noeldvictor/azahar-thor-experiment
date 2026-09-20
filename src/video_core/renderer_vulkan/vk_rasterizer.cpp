@@ -9,6 +9,7 @@
 #include "common/logging/log.h"
 #include "common/math_util.h"
 #include "common/microprofile.h"
+#include <chrono>
 #include "common/settings.h"
 #include "core/core.h"
 #include "core/loader/loader.h"
@@ -860,6 +861,23 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         viewport.y + viewport.height,
     };
     pipeline_info.dynamic_info.scissor = draw_rect;
+
+#if THOR_FRAME_PROFILING
+    // A 3DS screen buffer is padded to a power of two, so the render area can be larger than the
+    // part the display ever shows. If the viewport is the full padded area then every pass shades
+    // that padding for nothing. Log the two rectangles once a second to settle which it is.
+    {
+        static std::chrono::steady_clock::time_point last_viewport_log{};
+        const auto now = std::chrono::steady_clock::now();
+        if (draw_rect.GetArea() >= 262144u && now - last_viewport_log > std::chrono::seconds{1}) {
+            last_viewport_log = now;
+            LOG_INFO(Render_Vulkan,
+                     "ThorViewport draw_rect={}x{} viewport={}x{} at {},{} fb={}x{}",
+                     draw_rect.GetWidth(), draw_rect.GetHeight(), viewport.width, viewport.height,
+                     viewport.x, viewport.y, framebuffer->Width(), framebuffer->Height());
+        }
+    }
+#endif
 
     // Put the PICA depth transform in the viewport depth range when it fits there. The shader
     // then writes no depth, which keeps the early depth test and the low resolution Z pass.

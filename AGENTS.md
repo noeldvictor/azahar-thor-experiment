@@ -2244,3 +2244,12 @@
   Cutting the rest means reducing work in the main target, which is the thing resolution scaling
   exists to do, so at 3x and 4x it is the same as lowering the resolution. There is no fragment
   reduction available that keeps the picture and the resolution.
+- No pass shades the screen buffer's padding (2026-09-20). A 3DS screen buffer is padded to a
+  power of two, so the framebuffer for the top screen is 512x1024 at 2x while the display only
+  uses part of it, and the pass trace reports the render area as 512x1024 whenever the full area
+  path is taken. That looked like a quarter of every pass being thrown away. It is not: the
+  viewport and the scissor are both 496x800, the used region, and a render area larger than the
+  scissor costs nothing on the direct path because there are no tiles to load. `ThorViewport` in
+  the profiling build prints all three rectangles. With that settled, the overdraw is about six
+  times per pass across roughly thirteen full screen passes, and all of it is the game's own
+  layering.
