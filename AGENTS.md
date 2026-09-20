@@ -2120,3 +2120,12 @@
   and at 72 frames per second that is 2.4 gigapixels per second, which is close to what this part
   delivers for shading with a texture fetch and a blend. Doubling the speed would need twice that
   rate. Treat 200% at 2x in this scene as out of reach, and say so rather than looking again.
+- Where the 33 million fragments come from (2026-09-19). With the query slots aligned to one
+  frame, the snow field runs 95 render passes and 32.8 million fragment shader invocations per
+  frame at 2x. The six heaviest passes shade about 2.36 million fragments each and each of them
+  is a single draw call, so together they are 41% of the frame. One PICA draw can be thousands
+  of triangles, so that is one particle batch overlapping itself several times over. It is the
+  game submitting the geometry, not the emulator drawing anything twice. No render pass shades
+  its padding: the counts do not track the padded surface size.
+  `ThorHeavyPasses` in the profiling build prints the heaviest passes with their area and draw
+  count. Use it before proposing any change that claims to cut overdraw.

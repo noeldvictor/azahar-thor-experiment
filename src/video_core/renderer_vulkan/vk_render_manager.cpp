@@ -160,7 +160,18 @@ void RenderManager::ReportPassTrace() {
 #else
     const auto now = std::chrono::steady_clock::now();
     if (now - last_trace_log < std::chrono::seconds{1} || pass_trace.empty()) {
+        // The trace holds one frame, so the query slots must start again with it. Without this
+        // the slot numbers run on across frames and no longer name the pass they measured.
         pass_trace.clear();
+        if (timestamp_pool && fragment_pool && timestamp_index != 0) {
+            scheduler.Record([pool = *timestamp_pool, frag = *fragment_pool,
+                              used = timestamp_index](vk::CommandBuffer cmdbuf) {
+                cmdbuf.resetQueryPool(pool, 0, used * 2);
+                cmdbuf.resetQueryPool(frag, 0, used);
+            });
+            timestamp_index = 0;
+            timestamps_ready = false;
+        }
         return;
     }
     last_trace_log = now;
@@ -227,6 +238,23 @@ void RenderManager::ReportPassTrace() {
             for (const u64 value : frags) {
                 total += value;
             }
+            // The heaviest passes, with the area each one was given. Compare the fragment count
+            // against width times height: a pass that shades far more than its area is overdraw,
+            // and one that shades close to its area for a single draw is covering the whole
+            // surface including any padding the screen never shows.
+            std::vector<std::pair<u64, std::size_t>> by_frags;
+            for (u32 i = 0; i < timed && i < pass_trace.size(); i++) {
+                by_frags.emplace_back(frags[i], i);
+            }
+            std::sort(by_frags.begin(), by_frags.end(),
+                      [](const auto& a, const auto& b) { return a.first > b.first; });
+            std::string heavy;
+            for (std::size_t i = 0; i < by_frags.size() && i < 6; i++) {
+                const TracedPass& entry = pass_trace[by_frags[i].second];
+                heavy += fmt::format("{}x{}:{}draws:{}frag ", entry.width, entry.height,
+                                     entry.draws, by_frags[i].first);
+            }
+            LOG_INFO(Render_Vulkan, "ThorHeavyPasses {}", heavy);
             // Fragment shader invocations for the whole frame. Divide by the pixels on screen to
             // get the overdraw factor, which is the number that says whether the scene can ever
             // fit in the frame budget.
