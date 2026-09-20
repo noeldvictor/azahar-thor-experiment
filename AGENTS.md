@@ -2149,3 +2149,17 @@
   a 4% regression. The GPU reads these buffers, so a cached type makes the driver do cache
   maintenance that costs more than the faster stores save. The original choice is correct. Do not
   add `eHostCached` to an upload or stream buffer.
+- Reading the vertex attribute fields directly is neutral (2026-09-19, measured, reverted).
+  `GetFormat` and `GetNumElements` in `regs_pipeline.h` each build a twelve entry array on the
+  stack and index it once, and `GetElementSizeInBytes` called `GetFormat` twice. They run for
+  every attribute of every loader of every draw, and the CPU profile put `GetElementSizeInBytes`
+  alone at 0.83%. Replacing them with a direct shift and mask of the packed word, which is
+  provably the same value because the attributes sit four bits apart eight to a word, renders
+  correctly and measures 198.86% against 200.24% at 1x, inside the roughly 1% run to run spread
+  there. Clang was already folding the array away. Reverted.
+- Things already using the hardware properly, checked so nobody looks again (2026-09-19). The APK
+  ships `arm64-v8a` only; there is no x86 or 32-bit ARM code. The guest CPU JIT is on. Twelve
+  source files use NEON intrinsics. `Common::FindMinMax`, which scans the index buffer every
+  indexed draw, is NEON with a four way unrolled body. `ShaderSetup::WriteUniformFloatRegRange`
+  has an aarch64 path. xxHash is compiled with `XXH_VECTOR=XXH_NEON`; the `XXH3_hashLong_64b_default`
+  symbol in a profile means the default secret, not a scalar fallback.
