@@ -2291,3 +2291,7 @@
   the real work is helpers that never appear in the count. It is a property of the content at
   that scale, not something the emulator can reclaim, and it is why per-pixel cost falls from
   21.1 to 16.1 ns as resolution rises.
+- The SPIR-V optimizer makes no difference to speed (2026-09-20). `disable_spirv_optimizer` was
+  only ever tried while chasing relaxed precision, never measured for speed. Turning the optimizer
+  off gives 64.01% at 3x against 63.73% with it on, inside the spread. Mesa's own compiler
+  produces equivalent code either way, so leave the optimizer on and do not revisit this.
