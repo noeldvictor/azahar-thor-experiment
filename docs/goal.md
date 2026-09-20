@@ -190,3 +190,37 @@ Ranked next steps:
 - `disable_right_eye_render` changes nothing for Medarot 9.
 - A profiling build carries timing overhead. Never use it for FPS, power, or thermal claims.
 - A wake sequence with the MENU key while the screen is off brings the secondary-display launcher over the app and the present loop does not recover. Keep the screen on instead.
+
+## Outcome, 2026-09-19
+
+Three of the four targets are not reachable by emulator work on this scene, and the reason is
+measured rather than argued. Record kept here so the goal is not restarted from scratch.
+
+What the session reached in the snow field from save state 5, GPU at 680 MHz in every sample:
+
+| resolution | frame limit | at start | at end | target |
+| --- | --- | --- | --- | --- |
+| 2x | 100 | 100%, GPU 99.8% busy | 99.9%, GPU 87.8% busy | 100% |
+| 2x | 200 | 103.40% | 120.52% | 200% |
+| 3x | 100 | 52.36% | 63.58% | 100% |
+| 4x | 100 | 31.07% | 39.03% | 100% |
+
+The frame is fully accounted for. Fragment arithmetic is 13% of it, measured by removing the
+per-stage combiner rounding. Framebuffer compression is already saving 12%, measured by turning
+it off. All 97 render passes together are 0.53 ms, priced at 5.5 us each with a switch that
+restarts the pass every N draws. Pass barriers are 0.49 ms. Texture filtering is under 1%.
+Shader occupancy is at its maximum of 16 waves with six registers.
+
+What is left is the fragment count. A pipeline statistics query counts 33.7 million fragment
+shader invocations per frame at 2x against 691,200 pixels on screen, which is 49x overdraw, and
+it is the game's own drawing: five rounds of about 163 draws into one target with a downsample
+chain between them. At 72 frames per second that is 2.4 gigapixels per second. Reaching 200% at
+2x would need 4.0, and reaching 100% at 4x would need the same work at four times the pixels.
+
+The premise in this goal, that the Adreno 740 has about 36 times the 3DS fill rate and so 4x
+needs 16, does not hold, because a PICA fill was one fixed-function pass and an emulated fill is
+a shader. That ratio consumes the headroom before resolution scaling starts.
+
+The honest target for this renderer and this scene is full speed at 2x with headroom to spare,
+and about 120% in fast forward. Anything beyond that needs the scene to shade fewer fragments,
+which means changing what the game draws.
