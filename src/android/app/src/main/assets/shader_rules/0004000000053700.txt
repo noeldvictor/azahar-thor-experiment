@@ -1,0 +1,36 @@
+# E.X. Troopers - coarse shading and draw rules for the AYN Thor.
+# Format: <fragment shader fingerprint>:<action>, one per line.
+# Actions: 2 or 4 for 2x2 or 4x4 coarse shading, thinN to keep one draw in N, skip to drop.
+# Find fingerprints with a profiling build: the ThorCoarsened and ThorShaderUse log lines.
+#
+# These 21 materials are the blended effect layers of the snow field. Dropping them takes 3x
+# from 60% to full speed. They were found by bisection: each group of the 28 blended materials
+# was dropped in turn and the frame measured for speed and for mean image brightness, so the
+# additive light layers could be told from the particle layers by something other than opinion.
+# The seven that carry the scene lighting are deliberately absent: dropping those takes mean
+# brightness from 136 to 61 and the scene goes dark.
+#
+# What this costs: the halftone dot screening over the cliffs and characters, which is part of
+# the game's comic-book look. The blizzard, the lighting and the ink outlines are kept. Delete
+# this file, or comment lines out, to get the original picture back at a lower frame rate.
+725FE625080ECDA8:skip
+53CA73516B463D4F:skip
+D0B9F1CFEBFD2AA8:skip
+7DC248F98DF841B3:skip
+E271321963FF048E:skip
+520AC5A5E2A1C101:skip
+F64F6838A17FEA84:skip
+87DE6C3594D3310E:skip
+06FA134A74941A94:skip
+6A5B3E263788FCF9:skip
+BF69B478363B5244:skip
+483BC75B7CBBB59B:skip
+CA826E4F52FDEF28:skip
+DF1619E09BCCE8B7:skip
+E7E8D48DE7DA276C:skip
+4B7D28C6225E1248:skip
+5A1D690A733C5DB2:skip
+B4AF0E42F0C48750:skip
+B51204FBE41473A1:skip
+47B7FB1070EE9717:skip
+132D092EF39D4D98:skip

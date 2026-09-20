@@ -2623,3 +2623,24 @@
   `MESA_GPU_TRACEFILE`, set through the existing `thor_driver_env.txt`, prints per pass whether it
   was tiled, why not, its draw count, its average per-sample bandwidth and its LRZ status, with no
   driver patch. It writes about 176 MB a minute, so it is for diagnosis and never for timing.
+- Full speed at 3x, measured (2026-09-20). E.X. Troopers holds **99.66% mean and 99.32% minimum
+  over eight samples at 59.23 FPS**, frame 10.79 ms against a 16.67 ms budget, `swap` 0.08 ms, GPU
+  at 680 MHz throughout, in the snow field loaded from save state 5 at **3x with
+  `screen_filter = 2`** and the frame limit at 100, on a shipping build with the overlay reading
+  `Speed: 100%`. It read 63.79% before this work. The GPU now idle-waits with about 6 ms spare.
+  How it was found, and why the earlier attempts failed. Coarse shading topped out at 74.94%
+  because it reduces shading and not blending; every fragment still did a colour read and write.
+  Dropping draws removes the fragments, so the same layer that plateaued at 74.94% reaches full
+  speed once the action is `skip` rather than a coarse rate.
+  Which materials to drop was decided by bisection rather than by eye. The 28 blended materials
+  were split into four groups and each group dropped in turn, with both speed and **mean image
+  brightness** recorded. One group moved brightness from 135.8 to 61.4: those seven carry the
+  scene lighting and are excluded. The other 21 changed brightness by under 5 and are the
+  particle and screening layers. Dropping those 21 gives full speed with mean brightness 138.7
+  against a baseline 136, so the scene is not dimmed.
+  **What it costs, stated plainly:** the halftone dot screening over the cliffs and characters is
+  gone, and that is part of the game's comic-book look. The blizzard, the lighting, the ink
+  outlines and the colour are kept. The cost is not hidden: the rule file says so at the top, and
+  deleting it restores the original picture at about 64%.
+  Measuring brightness rather than judging it is what made the bisection reliable; a light layer
+  and a particle layer are indistinguishable from render state and easy to confuse by eye.

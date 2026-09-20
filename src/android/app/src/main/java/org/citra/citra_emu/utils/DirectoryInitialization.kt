@@ -24,6 +24,8 @@ object DirectoryInitialization {
     private const val BUNDLED_CHEATS_DIR = "cheats"
     private const val BUNDLED_GAME_SETTINGS_DIR = "game_profiles"
     private const val GAME_SETTINGS_DIR = "GameSettings"
+    private const val BUNDLED_SHADER_RULES_DIR = "shader_rules"
+    private const val SHADER_RULES_DIR = "config/ShaderRules"
     private const val SYS_DIR_VERSION = "sysDirectoryVersion"
     private val REPLACEABLE_BUNDLED_CHEAT_SIZES = mapOf(
         "0004000000086300.txt" to 5076L,
@@ -54,6 +56,7 @@ object DirectoryInitialization {
                     NativeLibrary.createConfigFile()
                     installBundledCheats()
                     installBundledGameSettings()
+                    installBundledShaderRules()
                     GpuDriverHelper.initializeDriverParameters()
                     BundledGpuDriver.installIfNeeded(context)
                     DirectoryInitializationState.CITRA_DIRECTORIES_INITIALIZED
@@ -172,6 +175,56 @@ object DirectoryInitialization {
      * Seeds GameSettings/ with the per-title profiles shipped in assets. A file the user already
      * has is never touched, so in-app edits always win over bundled defaults.
      */
+    /**
+     * Seed the per-title draw rule files the renderer reads, the same way game profiles are
+     * seeded: a file the user already has is never overwritten, so an edited rule set wins over
+     * the bundled one and deleting a file restores the untouched picture.
+     */
+    private fun installBundledShaderRules() {
+        val rules = try {
+            context.assets.list(BUNDLED_SHADER_RULES_DIR) ?: return
+        } catch (e: IOException) {
+            Log.error("[DirectoryInitialization] Failed to list bundled shader rules: ${e.message}")
+            return
+        }
+        val ruleFiles = rules.filter { it.endsWith(".txt", ignoreCase = true) }
+        if (ruleFiles.isEmpty()) {
+            return
+        }
+        val tree = CitraApplication.documentsTree
+        if (tree.folderUriHelper("/$SHADER_RULES_DIR/", true) == null) {
+            Log.warning("[DirectoryInitialization] Failed to create $SHADER_RULES_DIR directory")
+            return
+        }
+        for (filename in ruleFiles) {
+            val destinationPath = "/$SHADER_RULES_DIR/$filename"
+            try {
+                if (tree.exists(destinationPath)) {
+                    continue
+                }
+                if (!tree.createFile("/$SHADER_RULES_DIR/", filename)) {
+                    Log.warning("[DirectoryInitialization] Failed to create $destinationPath")
+                    continue
+                }
+                context.assets.open("$BUNDLED_SHADER_RULES_DIR/$filename").use { input ->
+                    context.contentResolver.openOutputStream(tree.getUri(destinationPath), "wt")
+                        .use { output ->
+                            if (output == null) {
+                                Log.warning("[DirectoryInitialization] Failed to open $destinationPath")
+                            } else {
+                                copyFile(input, output)
+                            }
+                        }
+                }
+            } catch (e: Exception) {
+                Log.error(
+                    "[DirectoryInitialization] Failed to install bundled shader rules $filename: " +
+                        e.message
+                )
+            }
+        }
+    }
+
     private fun installBundledGameSettings() {
         val profiles = try {
             context.assets.list(BUNDLED_GAME_SETTINGS_DIR) ?: return
