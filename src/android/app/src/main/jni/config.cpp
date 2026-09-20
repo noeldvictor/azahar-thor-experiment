@@ -116,8 +116,53 @@ bool Config::ApplyGameSettings(u64 title_id) {
     sparse_overlay = false;
     std::swap(android_config, game_config);
 
+    ApplyShaderRules(title_id);
     LOG_INFO(Config, "Applied per-title settings {}", path);
     return true;
+}
+
+void Config::ApplyShaderRules(u64 title_id) {
+    // The rules live in their own file rather than in the ini, because inih caps a line at 200
+    // characters and a useful rule list runs to several hundred: 28 rules is about 530. The file
+    // takes one rule per line, allows blank lines and # comments, and is assembled here into the
+    // single string the renderer parses, so video_core has one code path either way.
+    const std::string rules_path =
+        fmt::format("{}ShaderRules/{:016X}.txt",
+                    FileUtil::GetUserPath(FileUtil::UserPath::ConfigDir), title_id);
+    std::string buffer;
+    FileUtil::ReadFileToString(true, rules_path, buffer);
+    if (buffer.empty()) {
+        return;
+    }
+    std::string joined;
+    std::size_t count = 0;
+    std::size_t pos = 0;
+    while (pos < buffer.size()) {
+        const std::size_t end = buffer.find(char{10}, pos);
+        std::string line = buffer.substr(pos, end == std::string::npos ? end : end - pos);
+        pos = (end == std::string::npos) ? buffer.size() : end + 1;
+        while (!line.empty() && (line.back() == char{13} || line.back() == ' ')) {
+            line.pop_back();
+        }
+        const std::size_t first = line.find_first_not_of(std::string{char{32}} + char{9});
+        if (first == std::string::npos) {
+            continue;
+        }
+        line = line.substr(first);
+        if (line[0] == '#' || line[0] == ';') {
+            continue;
+        }
+        if (!joined.empty()) {
+            joined += ',';
+        }
+        joined += line;
+        count++;
+    }
+    if (count == 0) {
+        return;
+    }
+    Settings::values.shader_shading_rules = joined;
+    LOG_INFO(Config, "Applied {} shader rules from {}", count, rules_path);
 }
 
 template <>

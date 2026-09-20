@@ -36,6 +36,10 @@ public:
     /// parse; global settings are left as they were.
     bool ApplyGameSettings(u64 title_id);
 
+    /// Load ShaderRules/<title id>.txt into Settings::values::shader_shading_rules. The ini
+    /// cannot hold the list because inih caps a line at 200 characters.
+    void ApplyShaderRules(u64 title_id);
+
     /// Path of the per-title settings file, without checking that it exists.
     static std::string GetGameSettingsPath(u64 title_id);
 

@@ -1040,6 +1040,19 @@ void RasterizerVulkan::ReportShaderUse() {
                            sorted[i].second.second);
     }
     LOG_INFO(Render_Vulkan, "ThorShaderUse shaders={} {}", sorted.size(), top);
+    // Every shader that got a coarse rate, not just the ones with the most draws. A full screen
+    // sheet is a handful of draws, so ranking by draw count hides exactly the shaders that
+    // matter and made a blanket rule look as though it touched only two materials.
+    std::string coarse;
+    u32 coarse_shaders = 0;
+    for (const auto& [hash, counts] : sorted) {
+        if (counts.second == 0) {
+            continue;
+        }
+        coarse_shaders++;
+        coarse += fmt::format("{:016X}:{}/{} ", hash, counts.second, counts.first);
+    }
+    LOG_INFO(Render_Vulkan, "ThorCoarsened shaders={} {}", coarse_shaders, coarse);
     shader_use.clear();
 #endif
 }

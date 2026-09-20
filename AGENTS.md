@@ -2527,3 +2527,30 @@
   the passes begin because the game changed colour target, and the depth-toggle restarts the
   retention change was written for are gone. There is no pass merging left to win, which closes
   the last route to making tiled rendering affordable here.
+- Why removing post-processing does not give Ocarina of Time frame rates (2026-09-20). A fair
+  challenge, and the arithmetic answers it. The premise is that post-processing is the cost. It is
+  not: by the strictest definition, a draw that samples a target an earlier pass wrote, with no
+  depth, covering the target, the post passes carry **4.1%** of the frame. Removing all of them
+  buys 4%.
+  The comparison that makes it concrete is `ThorFrameProfile draws`. Ocarina of Time 3D at 3x
+  reads `reads_render_target=0 passes_reading=0`: it never samples a render target, so it has no
+  post-processing chain at all. E.X. Troopers reads `reads_render_target=45947 passes_reading=24499`
+  over the same window. But the snow field's 95.4% is not in those passes either. It is 1800
+  alpha-blended draws a frame averaging 443 vertices, 1650 of them using depth, painting the big
+  target: the blizzard, as geometry.
+  The overdraw is the game's own and it fits the console. Fragment counts scale cleanly with
+  resolution, 32.9 million at 2x, 72.2 at 3x and 137.9 at 4x, which is about 8.2 million at 1x
+  over a 256x512 target, or roughly 62x overdraw. At 60 FPS that is about 490 million fragments a
+  second, inside a 268 MHz PICA200's fill budget. Capcom spent the console's fill rate on layered
+  blended snow and fog, and resolution scaling multiplies exactly that.
+- What variable rate shading can and cannot reach here (2026-09-20). Measured at 3x in the snow
+  field on a profiling build, so the absolute numbers carry profiling overhead and only the
+  differences matter: no rules 60.47%, 2x2 on the effect draws 72.61%, 4x4 74.94%. Fragment shader
+  invocations fall from 75.1 million to 35.8 million at 2x2 and 25.4 million at 4x4.
+  Note what does not follow. Fragments fall by a factor of three at 4x4 but the frame only
+  improves by a quarter, and 4x4 buys just two points over 2x2. Coarse shading reduces **shading**,
+  not **blending**: every one of those 72 million fragments still does a colour read and write
+  through the ROP whatever rate shades it. Blend traffic is the floor, which is why the curve
+  flattens. Reaching full speed at 3x would need the effect draws to cover fewer real pixels, not
+  merely be shaded more coarsely, which means rendering them into a smaller target and
+  compositing once. That is the remaining idea and it is not yet tried.
