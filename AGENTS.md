@@ -2307,3 +2307,13 @@
   up the tile buffer that would have absorbed the blended overdraw for free. Cutting the pass
   count is what would let tiling pay, and only then. Fixing either half alone does nothing, which
   is why every single-change experiment in this ledger has come back small.
+- What resolution the Thor's panel actually needs (2026-09-20, measured). The main panel is
+  1920x1080 and the emulator draws the 3DS top screen at 1800x1080 inside it, measured by finding
+  the non-black rectangle in a screenshot. The 3DS top screen is 400x240, so native 1:1 for this
+  panel is 1080 / 240 = 4.5x. That makes 2x an upscale of 2.25 times and visibly soft, 3x an
+  upscale of 1.5 times, 4x an upscale of 1.125 times and near native, and 5x a slight downscale,
+  which supersamples and is sharpest. Conception II already ships a 5x profile for the same
+  reason.
+  So 4x is the honest target for this device and 2x is the one setting that cannot look right on
+  it. Any future goal for the Thor should be written against 4x, not 2x. Quote this measurement
+  rather than the 3DS resolution when someone asks why 2x looks soft.
