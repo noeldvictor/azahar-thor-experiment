@@ -8,6 +8,7 @@
 #include "video_core/rasterizer_cache/pixel_format.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include <algorithm>
+#include <tuple>
 #include <string>
 #include "video_core/renderer_vulkan/vk_render_manager.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -272,6 +273,33 @@ void RenderManager::ReportPassTrace() {
             }
             LOG_INFO(Render_Vulkan, "ThorHeavyPasses big={} small={} top={}", big_target_frags,
                      small_target_frags, heavy);
+            // Group every pass of the frame by target size. Two passes of the same size doing the
+            // same amount of work is the signature of the same scene being drawn twice.
+            std::vector<std::tuple<u64, u32, u64>> groups; // key, count, fragments
+            for (u32 i = 0; i < timed && i < slot_area.size(); i++) {
+                const auto [w, h] = slot_area[i];
+                const u64 key = (static_cast<u64>(w) << 32) | h;
+                const auto it = std::find_if(groups.begin(), groups.end(), [key](const auto& g) {
+                    return std::get<0>(g) == key;
+                });
+                if (it == groups.end()) {
+                    groups.emplace_back(key, 1u, frags[i]);
+                } else {
+                    std::get<1>(*it)++;
+                    std::get<2>(*it) += frags[i];
+                }
+            }
+            std::sort(groups.begin(), groups.end(), [](const auto& a, const auto& b) {
+                return std::get<2>(a) > std::get<2>(b);
+            });
+            std::string shape;
+            for (std::size_t i = 0; i < groups.size() && i < 8; i++) {
+                const u64 key = std::get<0>(groups[i]);
+                shape += fmt::format("{}x{}:{}passes:{}frag ", static_cast<u32>(key >> 32),
+                                     static_cast<u32>(key & 0xFFFFFFFFu), std::get<1>(groups[i]),
+                                     std::get<2>(groups[i]));
+            }
+            LOG_INFO(Render_Vulkan, "ThorPassShape {}", shape);
             // Fragment shader invocations for the whole frame. Divide by the pixels on screen to
             // get the overdraw factor, which is the number that says whether the scene can ever
             // fit in the frame budget.

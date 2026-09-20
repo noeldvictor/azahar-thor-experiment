@@ -2261,3 +2261,14 @@
   a percent. Not taken. With `gmem`, autotune, `noubwc`, `noconcurrentresolves` and these two all
   measured, the driver flag space is closed; a Turnip change would have to be a real patch to the
   compiler or the render path, not a switch.
+- The shape of the frame, grouped by target size (2026-09-20). One frame at 2x is 95 passes:
+  30 at 512x1024 carrying 31,394,588 fragments, then 5 at 256x512, 20 at 128x256, 15 at 64x128,
+  5 at 128x56, 15 at 32x64 and 5 at 8x256 carrying 1,488,960 between them. The large passes are
+  95.5% of the work and average 1.05 million fragments each, which against a 496x800 scissor is
+  about 2.6 times overdraw per pass. So the frame is thirty full screen passes with modest
+  overdraw, not a few passes with enormous overdraw, and the repeated group in the pass trace is
+  the game's post-processing chain running several times.
+  Nothing in that shape is the emulator's doing. A pass boundary is forced by the target switch,
+  which Vulkan requires, and the 66 colour switches per frame are the game alternating targets.
+  `ThorPassShape` in the profiling build prints this grouping; use it on any other title before
+  assuming its frame looks like this one.
