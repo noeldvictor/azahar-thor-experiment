@@ -9549,3 +9549,26 @@ These notes are for AYN Thor Base/Pro/Max only. The assumed target is Snapdragon
   The two remaining targets are the CPU floor, about 8.3 ms per frame, and the 14.4 ns per
   pixel. To reach 200% at 2x the frame must fit in 8.33 ms, which the CPU floor alone fills. To
   reach 100% at 3x the frame must fit in 16.67 ms against 27.17 ms today.
+- Combiner rounding removed for this title, full sweep (2026-09-19). Snow field from save state 5,
+  six samples per row except the first which is twelve, GPU 680 MHz in every sample, screenshots
+  taken from each run and identical to the runs with rounding on.
+
+  | resolution | frame limit | with rounding | without | GPU busy without |
+  | --- | --- | --- | --- | --- |
+  | 2x | 100 | 99.99% | 99.96% | 88.2% |
+  | 2x | 200 | 114.99% | 120.52% | 99.9% |
+  | 3x | 100 | 61.47% | 63.58% | 99.9% |
+  | 4x | 100 | 37.58% | 39.03% | 99.8% |
+
+  The 2x row at limit 100 does not move because the frame limiter caps it; the gain shows as GPU
+  headroom instead, 88.2% busy against 91.5%. The other three rows are GPU bound and all improve.
+- Half precision is the next lever and nothing uses it (2026-09-19). Every fragment program
+  reports `0 half` registers, so all colour arithmetic runs in 32-bit floats. The Adreno 740 runs
+  16-bit at double rate, our bundled Turnip exports `VK_KHR_shader_float16_int8` and
+  `VK_KHR_16bit_storage`, and the driver even carries a `nofp16` debug flag to switch its own
+  16-bit lowering off, so the path exists. The emulator never enables the feature and never emits
+  a 16-bit type. Relaxed precision decorations were tried before and the driver ignored them, so
+  this has to be real 16-bit types in the generated SPIR-V, not decorations. The combiner is the
+  place to start: the rounding experiment proved that combiner instructions are what covers the
+  pixels, so halving the whole chain should be worth several times what removing the rounding was.
+  Precision is not a concern there, because each stage lands in eight bits either way.
